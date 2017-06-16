@@ -1,0 +1,240 @@
+#include "interrupt.h"
+//#include "ds1302.h"
+#include "crc.h"
+#include "sst25vf.h"
+
+extern void MoveWordLine1(void);
+extern void MoveWordLine2(void);
+extern void MoveWordLine3(void);
+
+/********************************************************************************
+ *							定时器4中断服务程序									*
+ ********************************************************************************
+*/
+void TIM4_IRQHandler(void)
+{
+	if(TIM_GetITStatus(TIM4, TIM_IT_Update) != RESET)  //检查TIM4更新中断发生与否
+	{
+		TIM_ClearITPendingBit(TIM4, TIM_IT_Update);		//清除TIMx更新中断标志
+		
+
+			TIM_Cmd(TIM4, DISABLE);
+
+	}
+}
+
+void SysTick_Handler(void)
+{
+//	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, DISABLE);               // 关闭DMA1时钟
+// 	DMA1_Channel5->CCR   &= ~1;
+// 	EXTI->PR  = 0x000FFFFFu;                                         // 清除中断标志
+//	EXTI->EMR = 0;                               // 关闭事件
+//	EXTI->IMR = 0;                               // 关闭中断
+// 	SysTick->CTRL = 0;
+// 	TIM3->CR1  &= ~(1u << 3);                                         // 设置工作模式
+	SysTick->CTRL = 0;
+}
+
+/********************************************************************************
+ *							定时器3中断服务程序		时间 Beep					*
+ ********************************************************************************
+*/
+void TIM3_IRQHandler(void)
+{
+	if(TIM_GetITStatus(TIM3, TIM_IT_Update) != RESET)  //检查TIM3更新中断发生与否
+	{
+		//TIM_ClearITPendingBit(TIM3, TIM_IT_Update);		//清除TIMx更新中断标志
+		TIM3->SR = (uint16_t)~TIM_IT_Update;				// 1
+		//TIM_Cmd(TIM3, DISABLE);
+		TIM3->CR1 &= (uint16_t)(~((uint16_t)TIM_CR1_CEN));	// 1
+		OffDisplay();
+
+	}
+}
+
+/********************************************************************************
+ *							定时器2中断 用于显示	    							*
+ ********************************************************************************
+*/
+void TIM2_IRQHandler(void)
+{
+	uint16_t i,z;
+	uint16_t  j;
+	uint8_t  *p;
+	uint16_t x,y;
+	
+	if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET)  //检查TIM2更新中断发生与否
+	{
+		TIM_ClearITPendingBit(TIM2, TIM_IT_Update);		//清除TIMx更新中断标志
+		//
+		if(DisplayIndex) p = &DisplayBuf1[0][0];
+		else             p = &DisplayBuf0[0][0];
+		GPIO_ResetBits(GPIOC,GPIO_Pin_5); //GPIOA->BRR = GPIO_Pin_11;						//595锁存
+		//
+		#if 1
+		for(j = 0; j < 3; j++)
+		{
+			x = (uint16_t)(LineIndex + j * 32) * MaxLine;
+			for(y = 0; y < MaxLine; y += 8)
+			{
+				for(z = 0; z < 8; z++)
+				{
+					GPIO_ResetBits(GPIOC,GPIO_Pin_4);
+					/*
+					switch(*(p + x + y + z))
+					{
+						case 1: i = 2; break;
+						case 2: i = 1; break;
+						case 3: i = 0; break;
+						default:i = 3; break;
+					}
+					switch(*(p + x + y + z + MaxLine * 16))
+					{
+						case 1: i |= 8; break;
+						case 2: i |= 4; break;
+						case 3: i |= 0; break;
+						default:i |= 0x0C; break;
+					}
+					GPIOB->BSRR = ((i & 0x0F) << 8) | ((~i & 0x0F) << 24);
+					*/
+					GPIO_ResetBits(GPIOB,GPIO_Pin_10); // red
+					GPIO_SetBits(GPIOB,GPIO_Pin_11); // greed
+					GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
+					
+					GPIO_SetBits(GPIOB,GPIO_Pin_13);
+					GPIO_ResetBits(GPIOB,GPIO_Pin_14);
+					GPIO_SetBits(GPIOB,GPIO_Pin_15);
+					
+					GPIO_SetBits(GPIOC,GPIO_Pin_4);
+				}
+			}
+		}
+		//
+		#endif
+		#if 0
+		j = 0;
+		for(i = LineIndex; i < 96*16; i += SaoMiao)
+		{
+			for(x = 0x80; x != 0; x >>=1)
+			{
+				z = (j & x) ? 0xF8 : 0xFF;
+				//z = 0xFE;
+				GPIO_ResetBits(GPIOC,GPIO_Pin_4);
+				WriteDisplayData(z);
+				GPIO_SetBits(GPIOC,GPIO_Pin_4);
+			}
+			j++;
+		}
+		#endif
+		//
+		
+		OffDisplay();													// 关显示	 低电平
+		
+		nop();nop();nop();nop();nop();nop();nop();
+		
+		
+		if(LineIndex & 0x01) GPIO_SetBits(GPIOC,GPIO_Pin_6);			//行选择
+		else                 GPIO_ResetBits(GPIOC,GPIO_Pin_6);
+		
+		if(LineIndex & 0x02) GPIO_SetBits(GPIOC,GPIO_Pin_7);
+		else                 GPIO_ResetBits(GPIOC,GPIO_Pin_7);
+		
+		if(LineIndex & 0x04) GPIO_SetBits(GPIOC,GPIO_Pin_9);
+		else                 GPIO_ResetBits(GPIOC,GPIO_Pin_9);
+		
+		
+		
+		
+		GPIO_SetBits(GPIOC,GPIO_Pin_5);//GPIOA->BSRR  = GPIO_Pin_11;	//595锁存	
+		
+		
+		nop();nop();nop();nop();nop();nop();nop();
+		#if 1
+		if(15 != Light)
+		{
+			TIM3->ARR  = SysDisplaySpeed * 10 * Light / 15;
+ 			TIM3->EGR |= TIM_EGR_UG;		// 1
+ 			TIM3->CR1 |= TIM_CR1_CEN;		// 1
+		}
+		#endif
+		OnDisplay();													//开显示
+		//
+		if(++LineIndex >= SaoMiao)
+		{
+			LineIndex = 0;
+			
+			if(++LED_Index >= 30) LED_Index = 0;
+			
+			switch(LED_Index)
+			{
+				//case  0: LEDON();break;
+				//case 15: LEDOFF();break;
+				default: break;
+			}
+		}
+	}
+}
+//
+/********************************************************************************
+ *								串口中断											*
+ ********************************************************************************
+*/
+void USART1_IRQHandler(void)
+{
+	#if 1
+	uint8_t temp;
+	
+	if(USART1->SR & (1 << 5))									//接收到数据
+	{
+		
+		temp = USART1->DR;				//对USART_DR的读操作可以将USART1->SR&(1<<5)位清零
+
+	}
+	#endif
+}
+//修改字库
+void UART_Receive_ZIKU(void)
+{
+
+}
+
+//接收一个字节
+void UART_Rceive_RXNE(void)
+{
+	uint32_t i;
+	
+	for(i = 0; i < 0x01000000; i++)
+	{
+		if(USART1->SR & ( 1 << 5))
+		{
+			ReceiveUSART1Data = USART1->DR;
+			
+			ReceiveUSART1True = TURE;
+			return;
+		}
+	}
+	ReceiveUSART1True = FALSE;
+}
+//
+
+//
+
+//
+
+/********************************************************************************
+ *									返回码										*
+ ********************************************************************************
+*/
+void ReturnByte(uint8_t byte)
+{
+	//RS485_T();
+	USART_SendData(USART1, byte);
+	//while(USART_GetFlagStatus(USART1, USART_IT_TXE)==RESET);//等待发完
+	while((USART1->SR & 0x40) == 0);
+	//RS485_R();
+}
+
+
+
+
+
