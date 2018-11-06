@@ -91,6 +91,8 @@ __CONFIG_H_EXT__ uint8_t  PictureIndex;
 
 //心跳包计数
 __CONFIG_H_EXT__ uint16_t timeout_index; //计数
+__CONFIG_H_EXT__ uint8_t timeout_index_p; //计数
+
 __CONFIG_H_EXT__ uint8_t  timeout_flag;  // 超时标志
 __CONFIG_H_EXT__ uint8_t  timeout_onece_text; // 有文本
 __CONFIG_H_EXT__ uint8_t  timeout_doing_color;

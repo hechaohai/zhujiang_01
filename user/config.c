@@ -51,6 +51,7 @@ void Data_Init(void)
 	CanDoIndexUp = 0;
 
 	timeout_index = 0;
+	timeout_index_p = 0;
 	timeout_flag = 1;
 	timeout_onece_text = 0;
 	timeout_doing_color = Red;
@@ -667,7 +668,7 @@ void init_system(void)
 	// 定时器TIM3初始化  显示时间5秒
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);		// 时钟使能
 	TIM_TimeBaseStructure.TIM_Period = SysDisplaySpeed;			// 设置在下一个更新事件装入活动的自动重装载寄存器周期的值	
-	TIM_TimeBaseStructure.TIM_Prescaler = 719;					// 设置用来作为TIMx时钟频率除数的预分频值
+	TIM_TimeBaseStructure.TIM_Prescaler = 71;					// 设置用来作为TIMx时钟频率除数的预分频值
 	TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;		// 设置时钟分割:TDTS = Tck_tim
 	TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;	// TIM向上计数模式
 	TIM_TimeBaseInit(TIM3, &TIM_TimeBaseStructure);				// 根据指定的参数初始化TIMx的时间基数单位
@@ -675,7 +676,7 @@ void init_system(void)
 	// 定时器TIM2初始化  扫描显示
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);		// 时钟使能
 	TIM_TimeBaseStructure.TIM_Period = SysDisplaySpeed;//9;//			// 设置在下一个更新事件装入活动的自动重装载寄存器周期的值	
-	TIM_TimeBaseStructure.TIM_Prescaler = 7199;					// 设置用来作为TIMx时钟频率除数的预分频值
+	TIM_TimeBaseStructure.TIM_Prescaler = 719;					// 设置用来作为TIMx时钟频率除数的预分频值
 	TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;		// 设置时钟分割:TDTS = Tck_tim
 	TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;	// TIM向上计数模式
 	TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);				// 根据指定的参数初始化TIMx的时间基数单位

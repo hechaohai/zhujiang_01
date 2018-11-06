@@ -233,6 +233,7 @@ void do_update_text(void)
 		return;
 
 	timeout_index = 0;
+	timeout_index_p = 0;
 	timeout_doing_color = 0;
 	
 	// 赋值当前显示信息

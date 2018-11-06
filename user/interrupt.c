@@ -72,17 +72,20 @@ void TIM2_IRQHandler(void)
 		
 		if(++timeout_index >= 20000)
 		{
-			timeout_index = 0;
-			
+			if(++timeout_index_p >= 10){
+				timeout_index_p = 0;
+				timeout_index = 0;
+				
 
-			//更新文本
-			//updata_flag = 2;
-			
-			// 之前没有警告
-			if(timeout_doing_color != Red)
-			{
-				timeout_flag = 1;
-				timeout_doing_color = Red;
+				//更新文本
+				//updata_flag = 2;
+				
+				// 之前没有警告
+				if(timeout_doing_color != Red)
+				{
+					timeout_flag = 1;
+					timeout_doing_color = Red;
+				}
 			}
 		}
 		//
@@ -398,8 +401,8 @@ void TIM2_IRQHandler(void)
 			}
 			time_index++;
 			time_upindex++;
-			time_sec = time_index / 250;
-			time_upsec = time_upindex / 250;
+			time_sec = time_index / 2500;
+			time_upsec = time_upindex / 2500;
 			//if(time_upsec > 0){
 			//	temp[0] = 0x99;
 			//	temp[1] = time_upsec;
