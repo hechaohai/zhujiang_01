@@ -5,6 +5,7 @@
 
 #include "sst25vf.h"
 #include "crc.h"
+#include "string.h"
 //#include "ds1302.h"
 
 // // 第一行默认语 "欢迎乘坐舟山快速公交"
@@ -24,21 +25,35 @@
 // 	0x70,0x69,0x64,0x20,0x54,0x72,0x61,0x6E,0x73,0x69,0x74,
 // };
 
-const uint8_t const_word1[] = {
-	0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,
+const uint8_t const_word[ScreenLength] = {
+	//0xBB, 0xB6, 0xD3, 0xAD, 0xB9, 0xE2, 0xC1, 0xD9,//欢迎光临
+	0xD7, 0xA2, 0xD2, 0xE2, 0xB0, 0xB2, 0xC8, 0xAB,//注意安全
 };
-const uint8_t const_word2[] = {
-	0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,
-};
-const uint8_t const_word3[] = {
-	0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,
-};
+
 
 //
 void Data_Init(void)
 {
-//	uint8_t i;
-	uint16_t x;
+	u8  i;
+	u16 x;
+	u8 *p,*pp;
+	
+	time_index = 0;
+	time_upindex = 0;
+	
+	CanRxIndex = 0;
+	CanDoIndexRx = 0;
+	
+	CanZiIndex = 0;
+	CanDoIndexZi = 0;
+	
+	CanUpIndex = 0;
+	CanDoIndexUp = 0;
+
+	timeout_index = 0;
+	timeout_flag = 1;
+	timeout_onece_text = 0;
+	timeout_doing_color = Red;
 	
 	for(x = 0; x < sizeof(RxBuffer); x++)
 	{
@@ -62,15 +77,259 @@ void Data_Init(void)
 	NowIndex = 0;
 	ReceiveUSART1Data = 0;						// 接收一个字节
 	ReceiveUSART1True = FALSE;					// 判断是否有接收字节
+	if_display_none = 0;
+	load_diplay();
+	
+	if_change_clor = 0;
+	
+	// 清除协议文本
+	for (i = 0 ; i < 15; i++) {
+		agreement_data.text[i].data[0] = 0xff;
+	}
+}
+
+
+void load_diplay(void)
+{
+	u8  i,len;
+	u8 date_temp[100];
+	u8  data_xor;
+	u16 x;
+	u8 *p,*pp;
+	u8 CMD;
+	u8 temp8,ret;
+	u8 temp[8] = {0,0,0,0,0,0,0,0};
+	
+display_done = 0;
+	
+	if(DisplayIndex) {p = &DisplayBuf0[0]; pp = &DisplayBuf1[0];}// 	if(DisplayIndex)  p = DisplayBuf0, pp = DisplayBuf1;
+	else             {p = &DisplayBuf1[0]; pp = &DisplayBuf0[0];}// 	else              p = DisplayBuf1, pp = DisplayBuf0;
+	
+	currnet_index = DEFAULT;
+
+	currnet_data[0].flag = Invalid;
+	currnet_data[1].flag = Invalid;
+	currnet_data[2].flag = Invalid;
+	currnet_data[3].flag = Invalid;
+	display_list[0] = 0;
+	display_list[1] = 0;
+	display_list[2] = 0;
+	display_list[3] = 0;
+	display_list_index = 0;
+
+	for (i = 0; i < 4; i++) {
+		currnet_data[i].id = i;
+		currnet_data[i].display_time = 15;
+		currnet_data[i].change_time = 3;
+		currnet_data[i].color = Yellow;
+		currnet_data[i].style = 3;//DISPLAY_MOVE;//
+		currnet_data[i].display_count = 0;
+		currnet_data[i].length = 0;//sizeof(const_word);
+	}
+
+	diplay_data.id = 0;
+	diplay_data.display_time = currnet_data[0].display_time;
+	diplay_data.change_time = currnet_data[0].change_time;
+	diplay_data.color = currnet_data[0].color;
+	diplay_data.style = currnet_data[0].style;//DISPLAY_MOVE;//
+	diplay_data.display_count = currnet_data[0].display_count;
+	diplay_data.length = 0;//sizeof(const_word);
+	for (i = 0; i < sizeof(const_word); i++) {
+		//diplay_data.text[i] = const_word[i];
+		//currnet_data[0].text[i] = const_word[i];
+	}
+	
+	Bemove        = 0;
+	HaveDisplayNum = 0;							// 上次移动后扫描多少次
+	MoveWord_p = &currnet_data[0].text[0];
+
+	updata_flag = 0;
+	update_agreement = 0;
+	text_count = 0;
+	
+	data_flag = 0;
+	
+	display_color = Yellow;
+	
+	time_index = 0;
+	time_upindex = 0;
+	time_sec = 0;
+	time_upsec = 0;
+	
+	return;
+	
+	//ClrNSS();
+	//Read_Data(PromptSartAddr1);
+	//for(i = 0; i < 8; i++){
+	//	temp[i]=Get_Byte();	
+	//}
+	//SetNSS();
+	//Can_Send_Msg(temp, 8);
+	
+	// 查看文本
+	CMD = 0;
+	if((0x7E == Read_Byte(PromptSartAddr1)))
+	{
+		len = Read_Byte(PromptSartAddr1 + 1);
+		
+		ClrNSS();
+		Read_Data(PromptSartAddr1 + 2);
+		data_xor = 0;
+		for( i = 0; i < len + 1; i++) {
+			date_temp[i] = Get_Byte();
+			data_xor ^= date_temp[i];
+		}
+		SetNSS();
+		// 校准通过
+		if(!data_xor){
+			diplay_data.length = len;
+			for (i = 0; i < len; i++) {
+				diplay_data.text[i] = date_temp[i];
+				currnet_data[0].text[i] = date_temp[i];
+			}
+			CMD = 1;
+		}
+		
+		
+	}
+
+	// 查看控制信息
+	CMD = 0;
+	if((0x7E == Read_Byte(PromptSartAddr2)))
+	{
+		
+		ClrNSS();
+		data_xor = 0;
+		for( i = 0; i < 5; i++)
+			data_xor ^= Get_Byte();
+		SetNSS();
+		// 校准通过
+		if(!data_xor){
+			CMD = 1;
+			diplay_data.display_time = Read_Byte(PromptSartAddr2 + 1);
+			diplay_data.color = Read_Byte(PromptSartAddr2 + 2);
+			diplay_data.style = Read_Byte(PromptSartAddr2 + 3);
+			diplay_data.change_time = Read_Byte(PromptSartAddr2 + 4);
+
+			currnet_data[0].display_time = diplay_data.display_time;
+			currnet_data[0].color = diplay_data.color;
+			currnet_data[0].style = diplay_data.style;
+			currnet_data[0].change_time = diplay_data.change_time;
+		}
+		
+	}
+	
+	
+	if (DISPLAY_STATIC == diplay_data.style) {
+		for (x = 0; x < DisplayBufMaxLength; x++)
+			upturn_buf[x] = 0;
+		
+		//uptext_index = 8;
+		upturn_index = 0;
+		
+		if(diplay_data.length > ScreenLength)
+			temp8 = ScreenLength;
+		else
+			temp8 = diplay_data.length;
+		
+		CheckFile(&upturn_buf[0], &diplay_data.text[0], temp8);
+		
+		uptext_index = temp8 - ret;
+		
+		for (x = 0; x < DisplayBufMaxLength; x++)
+			*(p + x) = 0;
+		
+		DisplayIndex = (DisplayIndex + 1) & 1;
+		for (x = 0; x < DisplayBufMaxLength; x++)
+			*(pp + x) = 0;
+	} else {
+		MoveIndex     = 0;							// 移动计数，满8位加载下一个文字
+		Move_LoadGB   = 0;							// 当前移动字符是GB2312(1)或ASCII(0)
+		MovetextNum   = 0;							// 移动第几个字节
+	}// 移动
+	
+}
+
+
+/********************************************************************************
+ *								加载显示信息										*
+ ********************************************************************************
+*/
+u8 CheckFile(u8 *buf_p, u8 *text_p, u8 len)
+{
+	u8  i,h,l,*p;
+	u16 x;
+	u8 j,line, temp;
+	s16 z;
+
+	p = buf_p;
+	x = 0;
+	
+	if (len < ScreenLength) {
+		x = ((ScreenLength - len) >> 1)  << 7;
+	}
+
+	for ( i = 0; i < len; i++) {
+		h = *(text_p + i);
+		
+		if (h < 0xA1) {
+			if (i >= ScreenLength)
+				return(len - i + 1);
+			LoadChar(p + x, (u16)h);
+			x += 128;
+		}
+		else
+		{
+			if (i >= (ScreenLength - 1))
+				return(len - i);
+			l  = *(text_p + i + 1);
+			LoadChar(p + x, ((u16)h << 8) | l );
+			x += 256;
+			i++;
+		}
+	}
+	
+	// 修正居中
+	if ((len < ScreenLength) && ((ScreenLength - len)%2)) {
+		p = buf_p;
+		for (z = DisplayBufMaxLength - 8; z >= 128; z -= 8){
+			*(p + z + 4) = *(p + z);
+			*(p + z + 5) = *(p + z + 1);
+			*(p + z + 6) = *(p + z + 2);
+			*(p + z + 7) = *(p + z + 3);
+			*(p + z)     = *(p + z - 124);
+			*(p + z + 1) = *(p + z - 123);
+			*(p + z + 2) = *(p + z - 122);
+			*(p + z + 3) = *(p + z - 121);
+		}
+		for (; z >= 0; z -= 8){
+			*(p + z + 4) = *(p + z);
+			*(p + z + 5) = *(p + z + 1);
+			*(p + z + 6) = *(p + z + 2);
+			*(p + z + 7) = *(p + z + 3);
+			*(p + z)     = 0;
+			*(p + z + 1) = 0;
+			*(p + z + 2) = 0;
+			*(p + z + 3) = 0;
+		}
+
+	}
+	
+	return 0;
+
 	
 
 	
+	
+	
 }
+
 //
 /********************************************************************************
  *								加载图片信息										*
  ********************************************************************************
 */
+#if 0
 void LoadPicture(uint8_t Index)
 {
 	uint8_t  *p,*pp;
@@ -146,50 +405,119 @@ void LoadPicture(uint8_t Index)
 		//for(x = 0; x < sizeof(DisplayBuf0); x++) *(pp + x) = *(p + x);
 	}
 }
+#endif
 /************************************************************************************
  *                                      加载文字										*
  *********************************************************8**************************/
 void LoadChar(uint8_t *p, uint16_t dat)
 {
     uint8_t i;
+	u8 a,b;
+	u16 x,y;
 	
     ClrNSS();
     if(dat == 0xA9A5)
 	{
-		for(i = 0; i < 32; i++)
-			*(p + i)  = 0xFF;//0x00;//
-		*(p + 7)      = 0x00;//0xff;//
-		*(p + 8)      = 0x00;//0xff;//
-		*(p + 7 + 16) = 0x01;//0xfe;//
-		*(p + 8 + 16) = 0x01;//0xfe;//
+		for(i = 0; i < 32; i++) {
+			//*(p + i)  = 0x00;//0xFF;//
+			*(p + i*8)     = 0;
+			*(p + i*8 + 1) = 0;
+			*(p + i*8 + 2) = 0;
+			*(p + i*8 + 3) = 0;
+			*(p + i*8 + 4) = 0;
+			*(p + i*8 + 5) = 0;
+			*(p + i*8 + 6) = 0;
+			*(p + i*8 + 7) = 0;
+		}
+		//*(p + 7)      = 0xff;//0x00;//
+		//*(p + 8)      = 0xff;//0x00;//
+		//*(p + 7 + 16) = 0xfe;//0x01;//
+		//*(p + 8 + 16) = 0xfe;//0x01;//
+		
+		x = 56;
+		y = 184;
+		for (i = 0; i < 16; i++) {
+			*(p + x + i)     = 0;
+			*(p + y + i)     = 0;
+		}		
 	}
 	else if(dat >= 0xB000)
     {
-        Read_Data(((uint32_t)(((dat >> 8u) - 0xB0) * 94u + ((dat & 0xFF) - 0xA1)) << 5) + 0x1CAF00u);
+			Read_Data(((uint32_t)(((dat >> 8u) - 0xB0) * 94u + ((dat & 0xFF) - 0xA1)) << 5) + 0x1CAF00u);
 		//Read_Data(((uint32_t)(((dat >> 8u) - 0xB0) * 94u + ((dat & 0xFF) - 0xA1)) << 5) + 0xAF00u);
-        for(i = 0; i < 16; i++)
-        {
-            *(p + i)      = ~Get_Byte();
-    		*(p + i + 16) = ~Get_Byte();
-        }
+			for(i = 0; i < 16; i++)
+			{
+				//*(p + i)      = ~Get_Byte();
+				//*(p + i + 16) = ~Get_Byte();
+				a = Get_Byte();
+				b = Get_Byte();
+				*(p + i*8)     = (a & (0x80)) >> 7;
+				*(p + i*8 + 1) = (a & (0x40)) >> 6;
+				*(p + i*8 + 2) = (a & (0x20)) >> 5;
+				*(p + i*8 + 3) = (a & (0x10)) >> 4;
+				*(p + i*8 + 4) = (a & (0x08)) >> 3;
+				*(p + i*8 + 5) = (a & (0x04)) >> 2;
+				*(p + i*8 + 6) = (a & (0x02)) >> 1;
+				*(p + i*8 + 7) = (a & (0x01));
+
+
+				*(p + i*8 + 128) = (b & (0x80)) >> 7;
+				*(p + i*8 + 129) = (b & (0x40)) >> 6;
+				*(p + i*8 + 130) = (b & (0x20)) >> 5;
+				*(p + i*8 + 131) = (b & (0x10)) >> 4;
+				*(p + i*8 + 132) = (b & (0x08)) >> 3;
+				*(p + i*8 + 133) = (b & (0x04)) >> 2;
+				*(p + i*8 + 134) = (b & (0x02)) >> 1;
+				*(p + i*8 + 135) = (b & (0x01));
+			}
     }
     else if(dat >= 0xA100)
     {
         Read_Data(((uint32_t)(((dat >> 8u) - 0xA1) * 94u + ((dat & 0xFF) - 0xA1)) << 5) + 0x1C8000u);
 		//Read_Data(((uint32_t)(((dat >> 8u) - 0xA1) * 94u + ((dat & 0xFF) - 0xA1)) << 5) + 0x8000u);
-        for(i = 0; i < 16; i++)
-        {
-            *(p + i)      = ~Get_Byte();
-    		*(p + i + 16) = ~Get_Byte();
+			for(i = 0; i < 16; i++)
+			{
+				//a = ~Get_Byte();
+				//b = ~Get_Byte();
+				a = Get_Byte();
+    		b = Get_Byte();
+
+				*(p + i*8)     = (a & (0x80)) >> 7;
+				*(p + i*8 + 1) = (a & (0x40)) >> 6;
+				*(p + i*8 + 2) = (a & (0x20)) >> 5;
+				*(p + i*8 + 3) = (a & (0x10)) >> 4;
+				*(p + i*8 + 4) = (a & (0x08)) >> 3;
+				*(p + i*8 + 5) = (a & (0x04)) >> 2;
+				*(p + i*8 + 6) = (a & (0x02)) >> 1;
+				*(p + i*8 + 7) = (a & (0x01));
+
+				*(p + i*8 + 128) = (b & (0x80)) >> 7;
+				*(p + i*8 + 129) = (b & (0x40)) >> 6;
+				*(p + i*8 + 130) = (b & (0x20)) >> 5;
+				*(p + i*8 + 131) = (b & (0x10)) >> 4;
+				*(p + i*8 + 132) = (b & (0x08)) >> 3;
+				*(p + i*8 + 133) = (b & (0x04)) >> 2;
+				*(p + i*8 + 134) = (b & (0x02)) >> 1;
+				*(p + i*8 + 135) = (b & (0x01));
         }
     }
     else
     {
-        Read_Data(((uint32_t)(dat & 127) << 4) + 0x1C0000);
+       Read_Data(((uint32_t)(dat & 127) << 4) + 0x1C0000);
 		//Read_Data(((uint32_t)(dat & 127) << 4));
-        for(i = 0; i < 16; i++)
-        {
-            *(p + i)      = ~Get_Byte();
+			for(i = 0; i < 16; i++)
+			{
+				//a = ~Get_Byte();
+				a = Get_Byte();
+				
+				*(p + i*8)     = (a & (0x80)) >> 7;
+				*(p + i*8 + 1) = (a & (0x40)) >> 6;
+				*(p + i*8 + 2) = (a & (0x20)) >> 5;
+				*(p + i*8 + 3) = (a & (0x10)) >> 4;
+				*(p + i*8 + 4) = (a & (0x08)) >> 3;
+				*(p + i*8 + 5) = (a & (0x04)) >> 2;
+				*(p + i*8 + 6) = (a & (0x02)) >> 1;
+				*(p + i*8 + 7) = (a & (0x01));
     	}
     }
     SetNSS();
@@ -247,15 +575,13 @@ void delay_us(uint8_t num)
 //
 void ClearDisplay(void)
 {
-	uint8_t i,j;
+	uint16_t i;
 	
-	for(i = 0; i < MaxRow; i++)
+	for(i = 0; i < DisplayBufMaxLength; i++)
 	{
-		for(j = 0; j < MaxLine; j++)
-		{
-			DisplayBuf0[i][j] = 0;
-			DisplayBuf1[i][j] = 0;
-		}
+			DisplayBuf0[i] = 0;
+			DisplayBuf1[i] = 0;
+		
 	}
 }
 //
@@ -348,7 +674,7 @@ void init_system(void)
 	
 	// 定时器TIM2初始化  扫描显示
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);		// 时钟使能
-	TIM_TimeBaseStructure.TIM_Period = SysDisplaySpeed;			// 设置在下一个更新事件装入活动的自动重装载寄存器周期的值	
+	TIM_TimeBaseStructure.TIM_Period = SysDisplaySpeed;//9;//			// 设置在下一个更新事件装入活动的自动重装载寄存器周期的值	
 	TIM_TimeBaseStructure.TIM_Prescaler = 7199;					// 设置用来作为TIMx时钟频率除数的预分频值
 	TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;		// 设置时钟分割:TDTS = Tck_tim
 	TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;	// TIM向上计数模式
@@ -488,7 +814,7 @@ void init_system(void)
 	NVIC->ICER[8  / 32]	|= 1u << (8  % 32);                          // 禁止EXTI2中断
 	// USART1
 	NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn;
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 3;
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
@@ -523,13 +849,13 @@ void init_system(void)
 	//IWDG_Enable();         //④使能 IWDG
 	
 	OffDisplay();	//关显示
-	
-	Data_Init();
-	
-	
 	Init_SST25VF();						//初始化Flash
+	
+	
+	
 	RS485_R();							//485接收
 	ClearScreen();						//清屏一行
+	//Data_Init();
 	
 	ReadID();
 	ReadLight();

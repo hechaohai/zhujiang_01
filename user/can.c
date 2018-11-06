@@ -1,6 +1,6 @@
 #include "can.h"
 #include "delay.h"
-
+#include "config.h"
 
 //CAN初始化
 //tsjw:重新同步跳跃时间单元.范围:1~3; CAN_SJW_1tq	 CAN_SJW_2tq CAN_SJW_3tq CAN_SJW_4tq
@@ -70,7 +70,7 @@ u8 CAN_Mode_Init(u8 tsjw,u8 tbs2,u8 tbs1,u16 brp,u8 mode)
 	CAN_ITConfig(CAN1,CAN_IT_FMP0,ENABLE);//FIFO0消息挂号中断允许.		    
   
   	NVIC_InitStructure.NVIC_IRQChannel = USB_LP_CAN1_RX0_IRQn;
-  	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;     // 主优先级为1
+  	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 3;     // 主优先级为1
   	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;            // 次优先级为0
   	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
   	NVIC_Init(&NVIC_InitStructure);
@@ -83,10 +83,120 @@ u8 CAN_Mode_Init(u8 tsjw,u8 tbs2,u8 tbs1,u16 brp,u8 mode)
 void USB_LP_CAN1_RX0_IRQHandler(void)
 {
   	CanRxMsg RxMessage;
-	int i=0;
+	int i=0,index;
+	u8 temp[8] = {0,0,0,0,0,0,0,0};
     CAN_Receive(CAN1, 0, &RxMessage);
-	for(i=0;i<8;i++)
-	printf("rxbuf[%d]:%d\r\n",i,RxMessage.Data[i]);
+
+
+	if (RxMessage.IDE == CAN_Id_Extended) {
+		// 显示协议
+	  if (RxMessage.ExtId == 0x0FEF7475) {
+			if (RxMessage.Data[0] == NOTIFY) {
+				timeout_index = 0;
+				// 有文本
+				if(1 == timeout_onece_text)
+				{
+					//更新文本
+					//if(timeout_doing_color != 0)
+					{
+						//updata_flag = 2;
+						//timeout_doing_color = 0;
+					}
+					// 之前超时为红色
+					if(timeout_doing_color == Red)
+					{
+						updata_flag = 2;
+						timeout_doing_color = Green;
+					}
+					// 之前超时为绿色
+					else if(timeout_doing_color == Green)
+					{
+						
+					}
+					// 之前无超时
+					else
+					{
+						
+					}
+				}
+				//无文本
+				else
+				{
+					// 之前超时为红色
+					if(timeout_doing_color == Red)
+					{
+						timeout_flag = 1;
+						timeout_doing_color = Green;
+					}
+					// 之前超时为绿色
+					else if(timeout_doing_color == Green)
+					{
+						
+					}
+					// 之前无超时
+					else
+					{
+						
+					}
+						
+				}
+				
+				Can_Send_Msg(&RxMessage.Data[0], 8);
+			}
+			else if(RxMessage.Data[0] <= TEXT) {
+				cmd_data = CMD_TEXT;
+				index = RxMessage.Data[0];
+				for (i = 0; i < 8; i++) {
+					agreement_data.text[index].data[i] = RxMessage.Data[i];
+					if((i>0)&&(agreement_data.text[index].data[i] != 0))
+						text_count++;
+				}
+				
+				if(RxMessage.Data[0] == 0) {
+					data_flag = 1;
+					data_time = 0;
+				}
+				
+			}
+			else if(RxMessage.Data[0] == FINISH){
+				cmd_data = CMD_FINISH;
+				for (i = 0; i < 8; i++) {
+					agreement_data.finish.data[i] = RxMessage.Data[i];
+				}
+				//if((data_flag == 1) && (data_time < 200))
+					update_agreement = 1;
+			}
+			else if(RxMessage.Data[0] == CONTROL){
+				cmd_data = CMD_CONTROL;
+				for (i = 0; i < 8; i++) {
+					agreement_data.control.data[i] = RxMessage.Data[i];
+				}
+				
+				update_agreement = 1;
+				temp[0] = 0xFE;
+				temp[1] = RxMessage.Data[1];
+				Can_Send_Msg(temp, 8);
+			}
+
+		}
+		// 字库
+		else if (RxMessage.ExtId == 0x12345678){
+			for (i = 0; i < 8; i++) {
+				CanZiBuffer[CanZiIndex] = RxMessage.Data[i];
+				CanZiIndex = (CanZiIndex + 1) & (CanMaxLength - 1);
+			}
+		}
+		// 升级
+		else if (RxMessage.ExtId == 0x87654321) {
+			for (i = 0; i < 8; i++) {
+				CanUpBuffer[CanUpIndex] = RxMessage.Data[i];
+				CanUpIndex = (CanUpIndex + 1) & (CanMaxLength - 1);
+			}
+		}
+	}
+	
+	
+
 }
 #endif
 
@@ -95,21 +205,22 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
 //msg:数据指针,最大为8个字节.
 //返回值:0,成功;
 //		 其他,失败;
-u8 Can_Send_Msg(u8* msg,u8 len)
+	u8 Can_Send_Msg(u8* msg,u8 len)
 {	
   u8 mbox;
   u16 i=0;
   CanTxMsg TxMessage;
   TxMessage.StdId=0x12;					 // 标准标识符为0
-  TxMessage.ExtId=0x12;				 // 设置扩展标示符（29位）
-  TxMessage.IDE=0;			 // 使用扩展标识符
+  TxMessage.ExtId=0x0FEF7574;				 // 设置扩展标示符（29位）
+  TxMessage.IDE=CAN_Id_Extended;			 // 使用扩展标识符
   TxMessage.RTR=0;		 // 消息类型为数据帧，一帧8位
   TxMessage.DLC=len;							 // 发送两帧信息
   for(i=0;i<len;i++)
   TxMessage.Data[i]=msg[i];				 // 第一帧信息          
   mbox= CAN_Transmit(CAN1, &TxMessage);   
   i=0;
-  while((CAN_TransmitStatus(CAN1, mbox)==CAN_TxStatus_Failed)&&(i<0XFFF))i++;	//等待发送结束
+  //while((CAN_TransmitStatus(CAN1, mbox)==CAN_TxStatus_Failed)&&(i<0XFFF))i++;	//等待发送结束
+  while((CAN_TransmitStatus(CAN1, mbox) != CAN_TxStatus_Ok)&&(i<0XFFF))i++;	//等待发送结束
   if(i>=0XFFF)return 1;
   return 0;		
 
