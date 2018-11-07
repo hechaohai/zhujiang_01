@@ -155,6 +155,7 @@ display_done = 0;
 	time_upindex = 0;
 	time_sec = 0;
 	time_upsec = 0;
+	upturn_index = 0;
 	
 	return;
 	

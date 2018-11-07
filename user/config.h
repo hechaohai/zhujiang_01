@@ -43,7 +43,7 @@ __CONFIG_H_EXT__ u8 display_color;
 #define SaoMiao				8
 #define ScreenLength        8								// 扫描字长
 //#define SysDisplaySpeed		(100u / SaoMiao)
-#define SysDisplaySpeed		4u
+#define SysDisplaySpeed		1u
 #define MaxLine				64							// 行点像素
 #define MaxRow				16								// 列点像素
 #define DisplayBufMaxLength (ScreenLength * 16*8)

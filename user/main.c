@@ -222,7 +222,7 @@ void do_update_text(void)
 			diplay_data.display_time = currnet_data[0].display_time;
 			diplay_data.change_time = currnet_data[0].change_time;
 			diplay_data.color = currnet_data[0].color;
-			diplay_data.style = currnet_data[0].style;
+			diplay_data.style = currnet_data[0].style * 4;
 		}
 
 		updata_flag = 0;

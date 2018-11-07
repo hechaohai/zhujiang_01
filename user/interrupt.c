@@ -385,9 +385,9 @@ void TIM2_IRQHandler(void)
 			//else if(diplay_data.length > ScreenLength)
 			else
 			{
-				if((upturn_index < 16) && (HaveDisplayNum)) {
-					Bemove = 1;
-					HaveDisplayNum = 0;upturn_index++;
+				if((upturn_index < 16) && (HaveDisplayNum >= 4)) {
+						Bemove = 1;
+						HaveDisplayNum = 0;upturn_index++;
 				}
 				//else if(HaveDisplayNum > 90) {
 				//	Bemove = 1;
@@ -396,10 +396,10 @@ void TIM2_IRQHandler(void)
 				//}
 				
 			}
-			time_index++;
+			//time_index++;
 			time_upindex++;
-			time_sec = time_index / 250;
-			time_upsec = time_upindex / 250;
+			//time_sec = time_index / 250;
+			time_upsec = time_upindex / 1000;
 			//if(time_upsec > 0){
 			//	temp[0] = 0x99;
 			//	temp[1] = time_upsec;
