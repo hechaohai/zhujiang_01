@@ -91,6 +91,7 @@ __CONFIG_H_EXT__ uint8_t  PictureIndex;
 
 //心跳包计数
 __CONFIG_H_EXT__ uint16_t timeout_index; //计数
+__CONFIG_H_EXT__ uint8_t timeout_index_p; //计数
 __CONFIG_H_EXT__ uint8_t  timeout_flag;  // 超时标志
 __CONFIG_H_EXT__ uint8_t  timeout_onece_text; // 有文本
 __CONFIG_H_EXT__ uint8_t  timeout_doing_color;
@@ -227,6 +228,8 @@ typedef struct {
 	u8 display_time;//亮度 1~15
 	u8 color;
 	u8 style;
+	u8 upstyle;
+	u8 if_screen_off;
 	u8 change_time;
 	u8 text[100];
 	u8 length;

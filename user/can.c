@@ -93,6 +93,7 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
 	  if (RxMessage.ExtId == 0x0FEF7475) {
 			if (RxMessage.Data[0] == NOTIFY) {
 				timeout_index = 0;
+				timeout_index_p = 0;
 				// спнд╠╬
 				if(1 == timeout_onece_text)
 				{
@@ -141,7 +142,11 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
 						
 				}
 				
-				Can_Send_Msg(&RxMessage.Data[0], 8);
+				//Can_Send_Msg(&RxMessage.Data[0], 8);
+				temp[0] = NOTIFY;
+				if(timeout_doing_color != Red)
+					temp[2] = 0xAA;
+				Can_Send_Msg(temp, 8);
 			}
 			else if(RxMessage.Data[0] <= TEXT) {
 				cmd_data = CMD_TEXT;

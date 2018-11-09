@@ -155,11 +155,13 @@ void check_timeout(void)
 {
 	u16 x;
 	u8 temp8, ret, i,j;
-	
+	u8 temp[8] = {NOTIFY,0,0xAA,0,0,0,0,0};
 	
 	if(timeout_flag)
 	{
+		Can_Send_Msg(temp, 8);
 		timeout_flag = 0;
+		//if(diplay_data.if_screen_off)
 		
 		diplay_data.style = 0;//静止显示
 		diplay_data.change_time = 0;//换屏时间
@@ -170,9 +172,10 @@ void check_timeout(void)
 			diplay_data.color = timeout_doing_color;// 
 		
 		diplay_data.length = ScreenLength;
+		
 		for(i = 0; i < ScreenLength; i++)
 		{
-			diplay_data.text[i] = const_word[i];
+			diplay_data.text[i] = const_word[i];//0x20;//
 		}
 		
 		for (x = 0; x < DisplayBufMaxLength; x++){
@@ -222,7 +225,7 @@ void do_update_text(void)
 			diplay_data.display_time = currnet_data[0].display_time;
 			diplay_data.change_time = currnet_data[0].change_time;
 			diplay_data.color = currnet_data[0].color;
-			diplay_data.style = currnet_data[0].style * 4;
+			diplay_data.style = currnet_data[0].style;
 		}
 
 		updata_flag = 0;
@@ -233,6 +236,7 @@ void do_update_text(void)
 		return;
 
 	timeout_index = 0;
+	timeout_index_p = 0;
 	timeout_doing_color = 0;
 	
 	// 赋值当前显示信息
@@ -535,6 +539,7 @@ void Communication(void)
 	u8 temp[8] = {0,0,0,0,0,0,0,0};
 	u8 canbuf[8]={1,2,3,4,5,6,7,8};
 	USART_InitTypeDef	USART_InitStructure;
+	u8 data;
 
 	u8 buf_recved[8]  = {RECVED,0,0,0,0,0,0,0};
 	u8 buf_require[8] = {REQUIRE,0,0,0,0,0,0,0};
@@ -733,41 +738,46 @@ void Communication(void)
 					currnet_data[0].color = (agreement_data.control.data[3] > 2) ?
 						Yellow : agreement_data.control.data[3];
 					
+					if(agreement_data.control.data[4] > 9){
+						diplay_data.upstyle = agreement_data.control.data[4] - 9;
+						agreement_data.control.data[4] -= 9;
+					}
+					
 					switch(agreement_data.control.data[4]) {
 						case 8:
-							currnet_data[0].style = 3;
+							currnet_data[0].style = 9;//3;
 							break;
 						case 7:
-							currnet_data[0].style = 4;
+							currnet_data[0].style = 12;//4;
 							break;
 						case 6:
-							currnet_data[0].style = 5;
+							currnet_data[0].style = 15;//5;
 							break;
 						case 5:
-							currnet_data[0].style = 7;
+							currnet_data[0].style = 21;//7;
 							break;
 						case 4:
-							currnet_data[0].style = 10;
+							currnet_data[0].style = 30;//10;
 							break;
 						case 3:
-							currnet_data[0].style = 15;
+							currnet_data[0].style = 45;//15;
 							break;
 						case 2:
-							currnet_data[0].style = 22;
+							currnet_data[0].style = 66;//;
 							break;
 						case 1:
-							currnet_data[0].style = 36;
+							currnet_data[0].style = 108;//36;
 							break;
 						case 0:
 							currnet_data[0].style = 0;
 							break;
 						default:
-							currnet_data[0].style = 2;
+							currnet_data[0].style = 200;//2
 							break;
 					}
 					
 					currnet_data[0].change_time = agreement_data.control.data[5];
-					
+					diplay_data.if_screen_off = agreement_data.control.data[6] & 0x3;
 					//亮度
 					currnet_data[0].display_time = agreement_data.control.data[2];
 					

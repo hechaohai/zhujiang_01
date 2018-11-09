@@ -51,6 +51,7 @@ void Data_Init(void)
 	CanDoIndexUp = 0;
 
 	timeout_index = 0;
+	timeout_index_p = 0;
 	timeout_flag = 1;
 	timeout_onece_text = 0;
 	timeout_doing_color = Red;
@@ -122,7 +123,7 @@ display_done = 0;
 		currnet_data[i].display_time = 15;
 		currnet_data[i].change_time = 3;
 		currnet_data[i].color = Yellow;
-		currnet_data[i].style = 3;//DISPLAY_MOVE;//
+		currnet_data[i].style = 9;//DISPLAY_MOVE;//
 		currnet_data[i].display_count = 0;
 		currnet_data[i].length = 0;//sizeof(const_word);
 	}
@@ -132,6 +133,8 @@ display_done = 0;
 	diplay_data.change_time = currnet_data[0].change_time;
 	diplay_data.color = currnet_data[0].color;
 	diplay_data.style = currnet_data[0].style;//DISPLAY_MOVE;//
+	diplay_data.upstyle = 3;
+	diplay_data.if_screen_off = 1;
 	diplay_data.display_count = currnet_data[0].display_count;
 	diplay_data.length = 0;//sizeof(const_word);
 	for (i = 0; i < sizeof(const_word); i++) {

@@ -73,16 +73,18 @@ void TIM2_IRQHandler(void)
 		if(++timeout_index >= 20000)
 		{
 			timeout_index = 0;
-			
+			if (++timeout_index_p >= 3) {
+				timeout_index_p = 0;
 
-			//更新文本
-			//updata_flag = 2;
-			
-			// 之前没有警告
-			if(timeout_doing_color != Red)
-			{
-				timeout_flag = 1;
-				timeout_doing_color = Red;
+				//更新文本
+				//updata_flag = 2;
+				
+				// 之前没有警告
+				if(timeout_doing_color != Red)
+				{
+					timeout_flag = 1;
+					timeout_doing_color = Red;
+				}
 			}
 		}
 		//
@@ -385,7 +387,7 @@ void TIM2_IRQHandler(void)
 			//else if(diplay_data.length > ScreenLength)
 			else
 			{
-				if((upturn_index < 16) && (HaveDisplayNum >= 4)) {
+				if((upturn_index < 16) && (HaveDisplayNum >= diplay_data.upstyle)) {
 						Bemove = 1;
 						HaveDisplayNum = 0;upturn_index++;
 				}
