@@ -144,7 +144,7 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
 				
 				//Can_Send_Msg(&RxMessage.Data[0], 8);
 				temp[0] = NOTIFY;
-				if(timeout_doing_color != Red)
+				if(display_done)
 					temp[2] = 0xAA;
 				Can_Send_Msg(temp, 8);
 			}

@@ -102,6 +102,7 @@ void load_diplay(void)
 	u8 temp[8] = {0,0,0,0,0,0,0,0};
 	
 display_done = 0;
+display_done_p = 0;
 	
 	if(DisplayIndex) {p = &DisplayBuf0[0]; pp = &DisplayBuf1[0];}// 	if(DisplayIndex)  p = DisplayBuf0, pp = DisplayBuf1;
 	else             {p = &DisplayBuf1[0]; pp = &DisplayBuf0[0];}// 	else              p = DisplayBuf1, pp = DisplayBuf0;
@@ -124,6 +125,7 @@ display_done = 0;
 		currnet_data[i].change_time = 3;
 		currnet_data[i].color = Yellow;
 		currnet_data[i].style = 9;//DISPLAY_MOVE;//
+		currnet_data[i].upstyle = 1;
 		currnet_data[i].display_count = 0;
 		currnet_data[i].length = 0;//sizeof(const_word);
 	}

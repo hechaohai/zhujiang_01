@@ -94,7 +94,7 @@ __CONFIG_H_EXT__ uint16_t timeout_index; //计数
 __CONFIG_H_EXT__ uint8_t timeout_index_p; //计数
 __CONFIG_H_EXT__ uint8_t  timeout_flag;  // 超时标志
 __CONFIG_H_EXT__ uint8_t  timeout_onece_text; // 有文本
-__CONFIG_H_EXT__ uint8_t  timeout_doing_color;
+__CONFIG_H_EXT__ uint8_t  timeout_doing_color; // 显示‘注意安全’
 
 
 // 上翻
@@ -218,6 +218,7 @@ __CONFIG_H_EXT__ u8 if_display_none; // 是否清屏
 __CONFIG_H_EXT__ u8 update_agreement;
 
 __CONFIG_H_EXT__ u8 display_done; // 0 显示中不更换，1 显示完一条信息
+__CONFIG_H_EXT__ u8 display_done_p; // 已经发送显示完成
 
 __CONFIG_H_EXT__ u8 display_list[4];
 __CONFIG_H_EXT__ u8 display_list_index;
@@ -257,6 +258,7 @@ typedef struct {
 	u8 display_time;
 	u8 color;
 	u8 style;
+	u8 upstyle;
 	u8 change_time;
 	u8 text[100];
 	u8 length;

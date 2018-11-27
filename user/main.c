@@ -164,6 +164,7 @@ void check_timeout(void)
 		//if(diplay_data.if_screen_off)
 		
 		diplay_data.style = 0;//静止显示
+		diplay_data.upstyle = 1;
 		diplay_data.change_time = 0;//换屏时间
 		diplay_data.display_time = 15; //亮度
 		//if(timeout_onece_text)
@@ -226,6 +227,7 @@ void do_update_text(void)
 			diplay_data.change_time = currnet_data[0].change_time;
 			diplay_data.color = currnet_data[0].color;
 			diplay_data.style = currnet_data[0].style;
+			diplay_data.upstyle = currnet_data[0].upstyle;
 		}
 
 		updata_flag = 0;
@@ -248,6 +250,7 @@ void do_update_text(void)
 	
 	diplay_data.display_count = 0;
 	display_done = 0;
+	display_done_p=0;
 	if_change_clor = 0;
 	
 	diplay_data.length = currnet_data[0].length;
@@ -262,28 +265,40 @@ void do_update_text(void)
 	
 	// 静止显示
 	if (DISPLAY_STATIC == diplay_data.style) {
-		
 		for (x = 0; x < DisplayBufMaxLength; x++){
 			upturn_buf[x] = 0;
 			DisplayBuf0[x] = 0;
 			DisplayBuf1[x] = 0;
 		}
 		
-		upturn_index = 0;
-		if(diplay_data.length > ScreenLength)
-			temp8 = ScreenLength;
-		else
-			temp8 = diplay_data.length;
-		ret = CheckFile(&upturn_buf[0], &diplay_data.text[0], temp8);
-		
-		uptext_index = temp8 - ret;
-		
-		//for (x = 0; x < DisplayBufMaxLength; x++)
-		//	*(p + x) = 0;
-		
-		//DisplayIndex = (DisplayIndex + 1) & 1;
-		//for (x = 0; x < DisplayBufMaxLength; x++)
-		//	*(pp + x) = *(p + x);
+		if(!diplay_data.upstyle) // 不上翻
+		{
+			upturn_index = 17;
+			if(DisplayIndex) {
+				p = &DisplayBuf1[0];
+			}
+			else {
+				p = &DisplayBuf0[0];
+			}
+			
+			if(diplay_data.length > ScreenLength)
+				temp8 = ScreenLength;
+			else
+				temp8 = diplay_data.length;
+			ret = CheckFile(p, &diplay_data.text[0], temp8);
+			
+			uptext_index = temp8 - ret;
+		}
+		else {
+			upturn_index = 0;
+			if(diplay_data.length > ScreenLength)
+				temp8 = ScreenLength;
+			else
+				temp8 = diplay_data.length;
+			ret = CheckFile(&upturn_buf[0], &diplay_data.text[0], temp8);
+			
+			uptext_index = temp8 - ret;
+		}
 			
 	}
 	// 移动显示
@@ -322,10 +337,10 @@ void UpTurning(void)
 u8 temp[8] = {0,0,0,0,0,0,0,0};
 
 	u8 temp8, ret;
+
 	
 	// 上翻一行
-	if (Bemove) {
-		display_done = 0;
+	if (Bemove && diplay_data.upstyle) {
 		Bemove = 0;
 		if(DisplayIndex) {p = &DisplayBuf0[0]; pp = &DisplayBuf1[0];}// 	if(DisplayIndex)  p = DisplayBuf0, pp = DisplayBuf1;
 		else             {p = &DisplayBuf1[0]; pp = &DisplayBuf0[0];}// 	else              p = DisplayBuf1, pp = DisplayBuf0;
@@ -377,8 +392,15 @@ u8 temp[8] = {0,0,0,0,0,0,0,0};
 		// 已经显示完一条信息
 		if (uptext_index >= diplay_data.length) {
 			diplay_data.display_count++;
-			//display_done = 1;
+			display_done = 1;
 			uptext_index = 0;
+			if(!display_done_p) {
+				temp[0] = NOTIFY;
+				if(display_done)
+					temp[2] = 0xAA;
+				Can_Send_Msg(temp, 8);
+				display_done_p = 1;
+			}
 			#if 0
 			if(time_sec >= diplay_data.display_time) {
 				display_done = 1;
@@ -392,7 +414,33 @@ u8 temp[8] = {0,0,0,0,0,0,0,0};
 				
 		}
 		// 加载一下屏显示
-		//else {
+		if(!diplay_data.upstyle) // 不上翻
+		{
+			for (x = 0; x < DisplayBufMaxLength; x++){
+				DisplayBuf0[x] = 0;
+				DisplayBuf1[x] = 0;
+			}
+			upturn_index = 17;
+			//if(DisplayIndex) {p = &DisplayBuf1[0]; pp = &DisplayBuf0[0];}
+			//else             {p = &DisplayBuf0[0]; pp = &DisplayBuf1[0];}
+			if(DisplayIndex) {
+				p = &DisplayBuf1[0];
+			}
+			else {
+				p = &DisplayBuf0[0];
+			}
+			
+			// 最后一次换屏
+			if(uptext_index + ScreenLength > diplay_data.length)
+				temp8 = diplay_data.length - uptext_index;
+			// 还有多次换屏
+			else
+				temp8 = ScreenLength;
+			ret = CheckFile(p, &diplay_data.text[uptext_index], temp8);
+			
+			uptext_index = temp8 - ret;
+		}
+		else {
 			// 清除换屏显示缓存
 			for (x = 0; x < DisplayBufMaxLength; x++)
 				upturn_buf[x] = 0;
@@ -408,7 +456,7 @@ u8 temp[8] = {0,0,0,0,0,0,0,0};
 			ret = CheckFile(&upturn_buf[0], &diplay_data.text[uptext_index], temp8);
 			
 			uptext_index += temp8 - ret;
-		//}
+		}
 		
 		//time_index = 0;
 		time_upindex = 0;
@@ -421,17 +469,17 @@ u8 temp[8] = {0,0,0,0,0,0,0,0};
 //
 void MoveWordLine(void)
 {
-	uint8_t  i,j,z,temp;
+	uint8_t  i,j,z;
 	uint8_t  h,l;
 	uint16_t x;
 	uint8_t  *p,*pp;
 	uint8_t  *word_p;
-	
+	uint8_t temp[8] = {0,0,0,0,0,0,0,0};
+
 	if (!Bemove)
 		return;
 	
 	Bemove = 0;
-	display_done = 0;
 	
 	if(DisplayIndex) {p = &DisplayBuf0[0]; pp = &DisplayBuf1[0];}// 	if(DisplayIndex)  p = DisplayBuf0, pp = DisplayBuf1;
 	else             {p = &DisplayBuf1[0]; pp = &DisplayBuf0[0];}// 	else              p = DisplayBuf1, pp = DisplayBuf0;
@@ -524,6 +572,13 @@ void MoveWordLine(void)
 			MovetextNum = 0;
 			diplay_data.display_count++;
 			display_done = 1;
+			if(!display_done_p) {
+				display_done_p = 1;
+				temp[0] = NOTIFY;
+				if(display_done)
+					temp[2] = 0xAA;
+				Can_Send_Msg(temp, 8);
+			}
 		}
 
 	}
@@ -671,6 +726,7 @@ void Communication(void)
 			
 			currnet_data[0].display_count = 0;
 			display_done = 0;
+			display_done_p=0;
 			
 			
 			currnet_data[0].length = count;
@@ -738,45 +794,65 @@ void Communication(void)
 					currnet_data[0].color = (agreement_data.control.data[3] > 2) ?
 						Yellow : agreement_data.control.data[3];
 					
-					if(agreement_data.control.data[4] > 9){
-						diplay_data.upstyle = agreement_data.control.data[4] - 9;
-						agreement_data.control.data[4] -= 9;
+					currnet_data[0].style = 0;
+					currnet_data[0].upstyle = 0;
+					//diplay_data.upstyle = 0;
+			
+					if(agreement_data.control.data[4] & 0x80) {
+						agreement_data.control.data[4] -= 0x80;
+						temp[0] = NOTIFY;
+						if(display_done)
+							temp[2] = 0xAA;
+						Can_Send_Msg(temp, 8);
 					}
-					
-					switch(agreement_data.control.data[4]) {
-						case 8:
-							currnet_data[0].style = 9;//3;
-							break;
-						case 7:
-							currnet_data[0].style = 12;//4;
-							break;
-						case 6:
-							currnet_data[0].style = 15;//5;
-							break;
-						case 5:
-							currnet_data[0].style = 21;//7;
-							break;
-						case 4:
-							currnet_data[0].style = 30;//10;
-							break;
-						case 3:
-							currnet_data[0].style = 45;//15;
-							break;
-						case 2:
-							currnet_data[0].style = 66;//;
-							break;
-						case 1:
-							currnet_data[0].style = 108;//36;
-							break;
-						case 0:
-							currnet_data[0].style = 0;
-							break;
-						default:
-							currnet_data[0].style = 200;//2
-							break;
+					if (agreement_data.control.data[4] > 19){
+					}
+					else if (agreement_data.control.data[4] > 11){
+						currnet_data[0].upstyle = agreement_data.control.data[4] - 11;
+					}
+					else if (agreement_data.control.data[4] > 9){
+					}
+					else if (agreement_data.control.data[4] > 0) {
+						switch(agreement_data.control.data[4]) {
+							case 9:
+								currnet_data[0].style = 6;//3;
+								break;
+							case 8:
+								currnet_data[0].style = 9;//3;
+								break;
+							case 7:
+								currnet_data[0].style = 12;//4;
+								break;
+							case 6:
+								currnet_data[0].style = 15;//5;
+								break;
+							case 5:
+								currnet_data[0].style = 21;//7;
+								break;
+							case 4:
+								currnet_data[0].style = 30;//10;
+								break;
+							case 3:
+								currnet_data[0].style = 45;//15;
+								break;
+							case 2:
+								currnet_data[0].style = 66;//;
+								break;
+							case 1:
+								currnet_data[0].style = 108;//36;
+								break;
+							//case 0:
+							//	currnet_data[0].style = 0;
+							//	break;
+							default:
+								currnet_data[0].style = 200;//2
+								break;
+						}
 					}
 					
 					currnet_data[0].change_time = agreement_data.control.data[5];
+					if(!currnet_data[0].change_time)
+						currnet_data[0].change_time = 3;
 					diplay_data.if_screen_off = agreement_data.control.data[6] & 0x3;
 					//亮度
 					currnet_data[0].display_time = agreement_data.control.data[2];
