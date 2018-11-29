@@ -144,7 +144,7 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
 				
 				//Can_Send_Msg(&RxMessage.Data[0], 8);
 				temp[0] = NOTIFY;
-				if(display_done)
+				if(display_done_p)
 					temp[2] = 0xAA;
 				Can_Send_Msg(temp, 8);
 			}

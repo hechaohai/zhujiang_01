@@ -121,11 +121,12 @@ display_done_p = 0;
 
 	for (i = 0; i < 4; i++) {
 		currnet_data[i].id = i;
-		currnet_data[i].display_time = 15;
-		currnet_data[i].change_time = 3;
+		currnet_data[i].display_time = 1;
+		currnet_data[i].change_time = 0;
 		currnet_data[i].color = Yellow;
 		currnet_data[i].style = 9;//DISPLAY_MOVE;//
 		currnet_data[i].upstyle = 1;
+		currnet_data[i].if_screen_off = 0;
 		currnet_data[i].display_count = 0;
 		currnet_data[i].length = 0;//sizeof(const_word);
 	}
@@ -136,7 +137,7 @@ display_done_p = 0;
 	diplay_data.color = currnet_data[0].color;
 	diplay_data.style = currnet_data[0].style;//DISPLAY_MOVE;//
 	diplay_data.upstyle = 3;
-	diplay_data.if_screen_off = 1;
+	diplay_data.if_screen_off = 0;
 	diplay_data.display_count = currnet_data[0].display_count;
 	diplay_data.length = 0;//sizeof(const_word);
 	for (i = 0; i < sizeof(const_word); i++) {
@@ -161,6 +162,7 @@ display_done_p = 0;
 	time_sec = 0;
 	time_upsec = 0;
 	upturn_index = 0;
+	suoping = 0;
 	
 	return;
 	
