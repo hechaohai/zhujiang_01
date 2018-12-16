@@ -60,20 +60,42 @@
 #include "crc.h"
 #include "sst25vf.h"
 //#include "aes128.h"
-#include "can.h"
+//#include "can.h"
 
 /////////////////////////////////////////////////////////////////////////////////////
 extern const uint16_t CRC16Table[];
-extern const uint8_t const_word[];
+extern const uint8_t const_word[12];
+extern const uint8_t const_word1[];
+extern const uint8_t ReceiveData_Head[66];
+extern const uint8_t monthdays[12];
 
 void UpText(uint16_t len);				//处理串口数据
 
 void UpGrade(uint16_t len);
-void ReturnUpdataError(void);
+//void ReturnUpdataError(void);
 void ReturnUpdataOK(void);
 void ReturnText(uint8_t ret);
 void Communication(void);
 void ReturnVN(void);					//返回版本号
+void do_GNRMC(void);
+void do_fenduan(u8 i,u8 j);
+
+void do_load_move(void);
+
+void MoveWordLine_text(void);
+void Move_text_left(void);
+void Move_text_right(void);
+
+void MoveWordLine_gps(void);
+void Move_gps_left(void);
+void Move_gps_right(void);
+
+void do_update_text(void);
+void check_timeout(void);
+void do_update_receive(void);
+void check_timeout2(u8 *p,u8 m);
+void do_save_receive(void);
+void do_chaoshi(void);
 //
 
 #define VN	0x04
@@ -100,865 +122,148 @@ __asm void StartAPP()
     NOP
 	NOP
 }*/
-void MoveWordLine(void);
-void UpTurning(void);
-void do_update_text(void);
-void check_timeout(void);
+
 /********************************************************************************
  *								主函数											*
  ********************************************************************************
  */
 int main(void)
 {
-	u8 res;
-	u8 i,temp,num;
-	int key = 0;
-	u8 canbuf[8]={1,2,3,4,5,6,7,8};
-	u16 x,y;
-	u8 *p,*pp;
-	//
-	u8 mode=CAN_Mode_Normal;//CAN工作模式;CAN_Mode_Normal(0)：普通模式，CAN_Mode_LoopBack(1)：环回模式
-	
+	OffDisplay;	//关显示
 	SetNSS();
 	init_system();				// 系统初始化
-//CAN_Mode_Init(CAN_SJW_1tq,CAN_BS2_8tq,CAN_BS1_7tq,5,CAN_Mode_LoopBack);//CAN初始化环回模式,波特率450Kbps    
-	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS2_8tq,CAN_BS1_9tq,8,CAN_Mode_Normal);//CAN普通模式初始化, 波特率250Kbps 
-	//PCLK1 = 36Mhz
-	//baud = 36 / (1 +　BS2　+ BS1 ) / brp = 36 / ( 1+8+9) /8 = 0.25M bps
-Data_Init();
 	//
-	//LEDOFF();
-	LEDON();
-
+	LEDON();//LEDOFF();
+	
+	UBX_CFG_MSG();
+	
+	//check_timeout();
+	receive_update = 1;
+	do_update_receive();
+	//do_chaoshi();
+	//do_data();
 	while(1)
 	{
-		//IWDG_ReloadCounter();
-		check_timeout();
 		Communication();
-		do_update_text();
-		
-		//if(if_display_none)
-			//continue;
-		
-		if(DISPLAY_STATIC == diplay_data.style) {
-				UpTurning();
-		}else{
-			MoveWordLine();
-			
-		}		
 	}
 
 }
-
-//
-void check_timeout(void)
-{
-	u16 x;
-	u8 temp8, ret, i,j;
-	u8 temp[8] = {NOTIFY,0,0xAA,0,0,0,0,0};
-	
-	if(timeout_flag)
-	{
-		Can_Send_Msg(temp, 8);
-		timeout_flag = 0;
-		//if(diplay_data.if_screen_off)
-		
-		diplay_data.style = 0;//静止显示
-		if (!diplay_data.upstyle)
-			diplay_data.upstyle = 1;
-		diplay_data.change_time = 0;//换屏时间
-		diplay_data.display_time = 15; //亮度
-		//if(timeout_onece_text)
-		//	diplay_data.color = Green;// 
-		//else
-			diplay_data.color = timeout_doing_color;// 
-		
-		diplay_data.length = ScreenLength;
-		
-		for(i = 0; i < ScreenLength; i++)
-		{
-			diplay_data.text[i] = const_word[i];//0x20;//
-		}
-		
-		for (x = 0; x < DisplayBufMaxLength; x++){
-			upturn_buf[x] = 0;
-			DisplayBuf0[x] = 0;
-			DisplayBuf1[x] = 0;
-		}
-		
-		upturn_index = 0;
-
-		temp8 = ScreenLength;
-
-		ret = CheckFile(&upturn_buf[0], &diplay_data.text[0], temp8);
-		
-		uptext_index = temp8 - ret;
-		
-		diplay_data.display_count = 0;
-		// 记时清零
-		time_index = 0;
-		time_upindex = 0;
-		time_sec = 0;
-		time_upsec = 0;
-	}
-}
-
-//
-void do_update_text(void)
-{
-	u8 *p, *pp;
-	u16 x;
-	u8 temp8, ret, i,j;
-	
-	
-	// 查看是否显示完一遍
-	//if (diplay_data.display_count == 0)
-	//if((!display_done) || (!diplay_data.display_count))
-	//	return;
-	
-	// 查看是否更新文件
-	if (updata_flag) {
-		if(2 == updata_flag)
-		{
-			if(!timeout_onece_text)
-			{
-				return;
-			}
-			diplay_data.display_time = currnet_data[0].display_time;
-			diplay_data.change_time = currnet_data[0].change_time;
-			diplay_data.color = currnet_data[0].color;
-			diplay_data.style = currnet_data[0].style;
-			diplay_data.upstyle = currnet_data[0].upstyle;
-			diplay_data.if_screen_off = currnet_data[0].if_screen_off;
-		}
-
-		updata_flag = 0;
-		currnet_index = updata_index;
-			
-	}
-	else 
-		return;
-
-	timeout_index = 0;
-	timeout_index_p = 0;
-	timeout_doing_color = 0;
-	
-	// 赋值当前显示信息
-	//diplay_data.id = currnet_data[0].id;
-	//diplay_data.display_time = currnet_data[0].display_time;
-	//diplay_data.change_time = currnet_data[0].change_time;
-	//diplay_data.color = currnet_data[0].color;
-	//diplay_data.style = currnet_data[0].style;
-	
-	diplay_data.display_count = 0;
-	display_done = 0;
-	display_done_p=0;
-	if_change_clor = 0;
-	
-	diplay_data.length = currnet_data[0].length;
-	for (i = 0; i < diplay_data.length; i++) {
-		diplay_data.text[i] = currnet_data[0].text[i];
-	}
-	
-
-	//
-	//if(DisplayIndex) {p = &DisplayBuf1[0]; pp = &DisplayBuf0[0];}
-	//else             {p = &DisplayBuf0[0]; pp = &DisplayBuf1[0];}
-	
-	// 静止显示
-	if (DISPLAY_STATIC == diplay_data.style) {
-		for (x = 0; x < DisplayBufMaxLength; x++){
-			upturn_buf[x] = 0;
-			DisplayBuf0[x] = 0;
-			DisplayBuf1[x] = 0;
-		}
-		
-		if(!diplay_data.upstyle) // 不上翻
-		{
-			upturn_index = 17;
-			if(DisplayIndex) {
-				p = &DisplayBuf1[0];
-			}
-			else {
-				p = &DisplayBuf0[0];
-			}
-			
-			if(diplay_data.length > ScreenLength)
-				temp8 = ScreenLength;
-			else
-				temp8 = diplay_data.length;
-			ret = CheckFile(p, &diplay_data.text[0], temp8);
-			
-			uptext_index = temp8 - ret;
-		}
-		else {
-			upturn_index = 0;
-			if(diplay_data.length > ScreenLength)
-				temp8 = ScreenLength;
-			else
-				temp8 = diplay_data.length;
-			ret = CheckFile(&upturn_buf[0], &diplay_data.text[0], temp8);
-			
-			uptext_index = temp8 - ret;
-		}
-			
-	}
-	// 移动显示
-	else {
-		if(DisplayIndex) {p = &DisplayBuf1[0]; pp = &DisplayBuf0[0];}
-		else             {p = &DisplayBuf0[0]; pp = &DisplayBuf1[0];}
-		for (x = 0; x < DisplayBufMaxLength; x++)
-			*(p + x) = 0;
-		
-		DisplayIndex = (DisplayIndex + 1) & 1;
-		for (x = 0; x < DisplayBufMaxLength; x++)
-			*(pp + x) = 0;
-		
-		MoveIndex     = 0;							// 移动计数，满8位加载下一个文字
-		Move_LoadGB   = 0;							// 当前移动字符是GB2312(1)或ASCII(0)
-		MovetextNum   = 0;							// 移动第几个字节
-	}
-	
-	
-	diplay_data.display_count = 0;
-	// 记时清零
-	time_index = 0;
-	time_upindex = 0;
-	time_sec = 0;
-	time_upsec = 0;
-
-	
-}
-// 上翻
-void UpTurning(void)
-{
-	uint8_t  *p,*pp;
-	uint8_t  i,j;
-	uint16_t x, y;
-
-u8 temp[8] = {0,0,0,0,0,0,0,0};
-
-	u8 temp8, ret;
-
-	if(diplay_data.if_screen_off && display_done_p)
-		return;
-	// 上翻一行
-	if (Bemove && diplay_data.upstyle) {
-		Bemove = 0;
-		if(DisplayIndex) {p = &DisplayBuf0[0]; pp = &DisplayBuf1[0];}// 	if(DisplayIndex)  p = DisplayBuf0, pp = DisplayBuf1;
-		else             {p = &DisplayBuf1[0]; pp = &DisplayBuf0[0];}// 	else              p = DisplayBuf1, pp = DisplayBuf0;
-
-
-			for (i = 0; i < 15 - upturn_index; i++) {
-				for(x = i * 8; x < DisplayBufMaxLength; x += 128) {
-					*(p + x)     = *(p + x +  8);
-					*(p + x + 1) = *(p + x +  9);
-					*(p + x + 2) = *(p + x + 10);
-					*(p + x + 3) = *(p + x + 11);
-					*(p + x + 4) = *(p + x + 12);
-					*(p + x + 5) = *(p + x + 13);
-					*(p + x + 6) = *(p + x + 14);
-					*(p + x + 7) = *(p + x + 15);
-				}
-			}
-			j = 0;
-			for (; i < 16; i++) {
-				y = j * 8;
-				for(x = i * 8; x < DisplayBufMaxLength; x += 128) {
-					*(p + x)     = upturn_buf[y];
-					*(p + x + 1) = upturn_buf[y + 1];
-					*(p + x + 2) = upturn_buf[y + 2];
-					*(p + x + 3) = upturn_buf[y + 3];
-					*(p + x + 4) = upturn_buf[y + 4];
-					*(p + x + 5) = upturn_buf[y + 5];
-					*(p + x + 6) = upturn_buf[y + 6];
-					*(p + x + 7) = upturn_buf[y + 7];
-					
-					y += 128;
-				}
-				j++;
-			}
-
-		//交换显示区
-		DisplayIndex = (DisplayIndex + 1) & 1;
-		
-		for (x = 0; x < DisplayBufMaxLength; x++)
-			 *(pp + x) = *(p + x);
-	}
-	//
-	
-	// 换一屏时间到
-	if (time_upsec >= diplay_data.change_time) {
-
-		if(!diplay_data.change_time)
-			return;
-		// 已经显示完一条信息
-		if (uptext_index >= diplay_data.length) {
-			diplay_data.display_count++;
-			display_done = 1;
-			uptext_index = 0;
-			//if(!display_done_p) {
-				temp[0] = NOTIFY;
-				//if(display_done_p)
-					temp[2] = 0xAA;
-				Can_Send_Msg(temp, 8);
-				display_done_p = 1;
-			//}
-			if(diplay_data.if_screen_off) {
-				for (x = 0; x < DisplayBufMaxLength; x++){
-					DisplayBuf0[x] = 0;
-					DisplayBuf1[x] = 0;
-				}
-				time_upindex = 0;
-				time_upsec = 0;
-				return;
-			}
-			#if 0
-			if(time_sec >= diplay_data.display_time) {
-				display_done = 1;
-				return;
-			}
-			else if(diplay_data.length > ScreenLength){
-				uptext_index = 0;
-			}
-			else return;
-			#endif
-				
-		}
-		display_done = 0;
-		// 加载一下屏显示
-		if(!diplay_data.upstyle) // 不上翻
-		{
-			for (x = 0; x < DisplayBufMaxLength; x++){
-				DisplayBuf0[x] = 0;
-				DisplayBuf1[x] = 0;
-			}
-			upturn_index = 17;
-			//if(DisplayIndex) {p = &DisplayBuf1[0]; pp = &DisplayBuf0[0];}
-			//else             {p = &DisplayBuf0[0]; pp = &DisplayBuf1[0];}
-			if(DisplayIndex) {
-				p = &DisplayBuf1[0];
-			}
-			else {
-				p = &DisplayBuf0[0];
-			}
-			
-			// 最后一次换屏
-			if(uptext_index + ScreenLength > diplay_data.length)
-				temp8 = diplay_data.length - uptext_index;
-			// 还有多次换屏
-			else
-				temp8 = ScreenLength;
-			ret = CheckFile(p, &diplay_data.text[uptext_index], temp8);
-			
-			uptext_index += temp8 - ret;
-		}
-		else {
-			// 清除换屏显示缓存
-			for (x = 0; x < DisplayBufMaxLength; x++)
-				upturn_buf[x] = 0;
-			
-			// 换屏记行从0开始
-			upturn_index = 0;
-			// 最后一次换屏
-			if(uptext_index + ScreenLength > diplay_data.length)
-				temp8 = diplay_data.length - uptext_index;
-			// 还有多次换屏
-			else
-				temp8 = ScreenLength;
-			ret = CheckFile(&upturn_buf[0], &diplay_data.text[uptext_index], temp8);
-			
-			uptext_index += temp8 - ret;
-		}
-		
-		//time_index = 0;
-		time_upindex = 0;
-		//time_sec = 0;
-		time_upsec = 0;
-	
-	}	
-	//
-}
-//
-void MoveWordLine(void)
-{
-	uint8_t  i,j,z;
-	uint8_t  h,l;
-	uint16_t x;
-	uint8_t  *p,*pp;
-	uint8_t  *word_p;
-	uint8_t temp[8] = {0,0,0,0,0,0,0,0};
-
-	if (!Bemove)
-		return;
-	
-	Bemove = 0;
-	
-	if(diplay_data.if_screen_off && display_done_p)
-		return;
-	if(DisplayIndex) {p = &DisplayBuf0[0]; pp = &DisplayBuf1[0];}// 	if(DisplayIndex)  p = DisplayBuf0, pp = DisplayBuf1;
-	else             {p = &DisplayBuf1[0]; pp = &DisplayBuf0[0];}// 	else              p = DisplayBuf1, pp = DisplayBuf0;
-	
-	if(!MoveIndex)
-	{
-		if(MovetextNum < diplay_data.length)
-		{
-			if(!Move_LoadGB)
-			{
-				h = diplay_data.text[MovetextNum];
-				
-				
-				//
-				if(h < 0xA1)
-				{
-					LoadChar(MoveBuf, (u16)h);
-				}
-				else
-				{
-					l = diplay_data.text[MovetextNum + 1];
-					LoadChar(MoveBuf, ((u16)h << 8) | l);
-					Move_LoadGB = 1;
-				}
-			}
-			else
-			{
-				Move_LoadGB = 0;
-				for(i = 0; i < 128; i++)
-				{
-					MoveBuf[i] = MoveBuf[i + 128];
-				}
-			}
-		}
-		else
-		{
-			for(i = 0; i < 128; i++)
-				MoveBuf[i] = 0;
-		}
-		
-	}
-	
-	for(i = 0; i < 16; i++)
-	{
-		x = i*8;
-		for(j = 0; j < ScreenLength - 1; j++)
-		{
-			
-			*(p + x)       = *(p + x + 1);
-			*(p + x + 1) = *(p + x + 2);
-			*(p + x + 2) = *(p + x + 3);
-			*(p + x + 3) = *(p + x + 4);
-			*(p + x + 4) = *(p + x + 5);
-			*(p + x + 5) = *(p + x + 6);
-			*(p + x + 6) = *(p + x + 7);
-			*(p + x + 7) = *(p + x + 128);
-			
-			x += 128;
-		}
-		*(p + x)       = *(p + x + 1);
-		*(p + x + 1) = *(p + x + 2);
-		*(p + x + 2) = *(p + x + 3);
-		*(p + x + 3) = *(p + x + 4);
-		*(p + x + 4) = *(p + x + 5);
-		*(p + x + 5) = *(p + x + 6);
-		*(p + x + 6) = *(p + x + 7);
-		*(p + x + 7) = MoveBuf[i*8];
-		
-		MoveBuf[i*8]       = MoveBuf[i*8 + 1];
-		MoveBuf[i*8 + 1] = MoveBuf[i*8 + 2];
-		MoveBuf[i*8 + 2] = MoveBuf[i*8 + 3];
-		MoveBuf[i*8 + 3] = MoveBuf[i*8 + 4];
-		MoveBuf[i*8 + 4] = MoveBuf[i*8 + 5];
-		MoveBuf[i*8 + 5] = MoveBuf[i*8 + 6];
-		MoveBuf[i*8 + 6] = MoveBuf[i*8 + 7];
-		MoveBuf[i*8 + 7] = 0;
-	}
-	
-	//交换显示区
-	DisplayIndex = (DisplayIndex + 1) & 1;
-	
-	for (x = 0; x < DisplayBufMaxLength; x++)
-		 *(pp + x) = *(p + x);
-	//
-	if(++MoveIndex >= 8)
-	{
-		MoveIndex = 0;
-		if(++MovetextNum >= (diplay_data.length + ScreenLength))
-		{
-			MovetextNum = 0;
-			diplay_data.display_count++;
-			display_done = 1;
-			//if(!display_done_p) {
-				display_done_p = 1;
-				temp[0] = NOTIFY;
-				//if(display_done_p)
-					temp[2] = 0xAA;
-				Can_Send_Msg(temp, 8);
-			//}
-			if(diplay_data.if_screen_off) {
-				for (x = 0; x < DisplayBufMaxLength; x++){
-					DisplayBuf0[x] = 0;
-					DisplayBuf1[x] = 0;
-				}
-				time_upindex = 0;
-				time_upsec = 0;
-				return;
-			}
-		}
-
-	}
-}
-
-
-
 void Communication(void)
 {
 	u32 addr, ui32;
-	u16 x, y,length;
-	u8 id,index,i,j,z,ret,count,count_m,data_temp,col;
-	u8 temp[8] = {0,0,0,0,0,0,0,0};
-	u8 canbuf[8]={1,2,3,4,5,6,7,8};
+	u8 i,ret,j,m,n;
+	u16 x, y;
+	u8 text[8];
+//	u8 id,index,i,j,z,ret,count,count_m,data_temp,col;
+//	u8 temp[8] = {0,0,0,0,0,0,0,0};
+//	u8 canbuf[8]={1,2,3,4,5,6,7,8};
 	USART_InitTypeDef	USART_InitStructure;
-	u8 data;
+//	u8 data;
 
-	u8 buf_recved[8]  = {RECVED,0,0,0,0,0,0,0};
-	u8 buf_require[8] = {REQUIRE,0,0,0,0,0,0,0};
+//	u8 buf_recved[8]  = {RECVED,0,0,0,0,0,0,0};
+//	u8 buf_require[8] = {REQUIRE,0,0,0,0,0,0,0};
 
-	// 显示协议
-	if (update_agreement) {
-		update_agreement = 0;
-		// 协议文本更新
-		if (cmd_data == CMD_FINISH) {
-			
-			//count = (agreement_data.finish.data[2] << 8 ) | agreement_data.finish.data[3];
-			count = agreement_data.finish.data[3];
+		while(1) {
+		RxIndex = UARTMaxLength_Text - DMA1_Channel5->CNDTR;
+
 		
-			// 判断长度是否超长
-			if (count > 100) {
-				return;
-			}
-			
-			
-			
-			col  = (count % 7) ? 1 : 0;
-			col += (count / 7);
-			
-			count_m = text_count;
-			text_count = 0;
-			
-			count_m = 0;
-			for (i = 0; i < col; i++) {
-				for(z = 1; z < 8; z++) {
-					if(agreement_data.text[i].data[z]) {
-						count_m++;
-					}
-					else {
-						i = col;
-						break;
-					}
-				}
-			}
-			
-			// 数据长度错误
-			if(count != count_m)
-			{
-				index = 1;
-				buf_require[0] = 0xFD;
-				for (i = 0; i < col; i++) {
-					if(agreement_data.text[i].data[0] != i) {
-						buf_require[index++] = i;
-						if(index > 7){
-							index = 1;
-							Can_Send_Msg(buf_require, 8);
-							buf_require[1] = 0;
-							buf_require[2] = 0;
-							buf_require[3] = 0;
-							buf_require[4] = 0;
-							buf_require[5] = 0;
-							buf_require[6] = 0;
-							buf_require[7] = 0;
-						}
-					}
-				}
-				if(1 != index) {
-					Can_Send_Msg(buf_require, 8);
-				}
-				return;
-			}
-			// ID错误
-			//else if (agreement_data.finish.data[1] > 3)
-			//	return;
-			
-			// 数据长度正确
-			else {
-				
-				buf_recved[1] = agreement_data.finish.data[1];
-				Can_Send_Msg(buf_recved, 8);
-				
-				
-				updata_flag = 1;
-				
-				index = 0;
-				#if 0
-				index = 0xff;
-				// 查找ID
-				if(agreement_data.finish.data[1] == 0)
-				{
-					index = 0;
-				}
-				else {
-					// 查找有效并相同的ID
-					for (i = 1; i < 4; i++) {
-						if ((currnet_data[i].flag == Valid) && \
-							(agreement_data.finish.data[1] == currnet_data[i].id)) {
-							index = i;
-							break;
-						}
-					}
-					if (i >= 4) {
-						// 查找未定义的ID
-						for (i = 1; i < 4; i++){
-							if (currnet_data[i].flag == Invalid) {
-								index = i;
-								break;
-							}
-						}
-					}
-						
-					// 查找定义ID最大值并去掉
-					if (index == 0xff) {
-						data_temp = 0;index = 0;
-						for (i = 1; i < 4; i++){
-							if((currnet_data[i].flag == Valid) && (currnet_data[i].id > data_temp)){
-							//if (currnet_data[i].id > index)
-								index = i;
-								data_temp = currnet_data[i].id;
-							}
-						}
-					}
-				}
-				#endif
-			}
-
-
-			// 赋值
-			currnet_data[0].flag = Valid;
-			currnet_data[0].id = agreement_data.finish.data[1];
-			//currnet_data[index].display_time = 1;
-			//currnet_data[index].change_time = 3;
-			//currnet_data[index].color = Yellow;
-			//currnet_data[index].style = DISPLAY_STATIC;//DISPLAY_MOVE;//
-			
-			currnet_data[0].display_count = 0;
-			display_done = 0;
-			display_done_p=0;
-			
-			
-			currnet_data[0].length = count;
-			//if(currnet_data[0].length <= ScreenLength)
-			//	currnet_data[0].style = 0;
-			//else
-			//	currnet_data[0].style = 3;
-			
-			j = 0;
-			for (i = 0; i < col; i++) {
-				for(z = 1; z < 8; z++) {
-					if(j < count) {
-						currnet_data[index].text[j++] = agreement_data.text[i].data[z];
-					}
-				}
-			}
-			#if 0
-			if(index == 0) {
-			//if(0){
-				//TIM_Cmd(TIM2, DISABLE);
-				//OffDisplay();					//关显示 
-				
-				WRDI();WREN(); Sector_Erase(PromptSartAddr1); delay_ms(40);WRDI();
-				
-				WREN(); Byte_Program(0x7E, PromptSartAddr1); Wait_Busy();WRDI();
-				
-				WREN(); Byte_Program(count, PromptSartAddr1 + 1); Wait_Busy();WRDI();
-					
-				ret = 0;
-				for(i = 0; i < count; i++)					// 加上头尾7e
-				{
-					WREN(); Byte_Program(currnet_data[0].text[i], PromptSartAddr1 + i + 2); Wait_Busy();
-					WRDI();
-					ret ^= currnet_data[0].text[i];
-				}
-				WREN(); Byte_Program(ret, PromptSartAddr1 + count + 2); Wait_Busy();
-				WRDI();
-				
-				//temp[0] = 0xaa;
-				//temp[1] = ret;
-					//Can_Send_Msg(temp, 8);
-
-				
-				//TIM_Cmd(TIM2, ENABLE);						
+		if(NowIndex == RxIndex) {
+			// GPS通讯
+			#if 1
+			if(Updata_GPS) {
+				do_GNRMC();
+				Updata_GPS = 0;
+				RxCounter_Gps = 0;
+				USART_ITConfig(USART3, USART_IT_RXNE, ENABLE);			//使能接收中断
 			}
 			#endif
-			
-			// 清除协议文本
-			for (i = 0 ; i < 15; i++) {
-				agreement_data.text[i].data[0] = 0xff;
+			// PC机通讯
+			if(receive_update){
+				do_save_receive();
+				do_update_receive();
+			}
+			// 时间超时 有效文本在显示 文本没有在移动
+			if(text_flag && !sys_move){
+				if((time_upsec > receive_data[text_index].time) || (0 == receive_data[text_index].time))
+				{
+					do_chaoshi();
+				}
+			}
+			if(sys_move && receive_data[text_index].tpye){
+				MoveWordLine_gps();
+			}
+			else if(sys_move)
+			{
+				MoveWordLine_text();
 			}
 			
-			updata_index = index;
-			timeout_onece_text = 1;
+			continue;
+			//return;
 		}
-		
-		// 控制文本
-		else if (cmd_data == CMD_CONTROL) {
-			updata_flag = 2;
-			
-			//for (i = 0; i < 4; i++) {
-				//if (agreement_data.control.data[1] == currnet_data[i].id) {
-				//	if_change_clor = 1;
-					
-					currnet_data[0].color = (agreement_data.control.data[3] > 2) ?
-						Yellow : agreement_data.control.data[3];
-					
-					currnet_data[0].style = 0;
-					currnet_data[0].upstyle = 0;
-					//diplay_data.upstyle = 0;
-			
-					
-					if (agreement_data.control.data[4] > 19){
-					}
-					else if (agreement_data.control.data[4] > 10){
-						currnet_data[0].upstyle = 20 - agreement_data.control.data[4];
-					}
-					else if (agreement_data.control.data[4] > 9){
-					}
-					else if (agreement_data.control.data[4] > 0) {
-						switch(agreement_data.control.data[4]) {
-							case 9:
-								currnet_data[0].style = 6;//3;
-								break;
-							case 8:
-								currnet_data[0].style = 9;//3;
-								break;
-							case 7:
-								currnet_data[0].style = 12;//4;
-								break;
-							case 6:
-								currnet_data[0].style = 15;//5;
-								break;
-							case 5:
-								currnet_data[0].style = 21;//7;
-								break;
-							case 4:
-								currnet_data[0].style = 30;//10;
-								break;
-							case 3:
-								currnet_data[0].style = 45;//15;
-								break;
-							case 2:
-								currnet_data[0].style = 66;//;
-								break;
-							case 1:
-								currnet_data[0].style = 108;//36;
-								break;
-							//case 0:
-							//	currnet_data[0].style = 0;
-							//	break;
-							default:
-								currnet_data[0].style = 200;//2
-								break;
-						}
-					}
-					
-					currnet_data[0].change_time = agreement_data.control.data[5];
-					if(!currnet_data[0].change_time)
-						currnet_data[0].change_time = 3;
-					
-					if(agreement_data.control.data[6] & 0x80) {
-						temp[0] = NOTIFY;
-						if(display_done_p)
-							temp[2] = 0xAA;
-						Can_Send_Msg(temp, 8);
-					}
-					if (agreement_data.control.data[6] & 0x3)
-						currnet_data[0].if_screen_off = 0;
-					else
-						currnet_data[0].if_screen_off = 1;
-					
-					
-					//亮度
-					#if 0
-					//currnet_data[0].display_time = agreement_data.control.data[2];
-					switch(agreement_data.control.data[2]) {
-								case 10:
-									currnet_data[0].display_time = 9;
-									break;
-								case 9:
-									currnet_data[0].display_time = 8;
-									break;
-								case 8:
-									currnet_data[0].display_time = 7;
-									break;
-								case 7:
-									currnet_data[0].display_time = 6;
-									break;
-								case 6:
-									currnet_data[0].display_time = 5;
-									break;
-								case 5:
-									currnet_data[0].display_time = 4;
-									break;
-								case 4:
-									currnet_data[0].display_time = 3;
-									break;
-								case 3:
-									currnet_data[0].display_time = 2;
-									break;
-								case 2:
-									currnet_data[0].display_time = 1;
-									break;
-								default:
-									currnet_data[0].display_time = 0;
-									break;
-							}
-						#endif
-					#if 1
-					if ((agreement_data.control.data[2] >0) &&
-						(agreement_data.control.data[2] < 16)) {
-							
-						currnet_data[0].display_time = agreement_data.control.data[2];
-						//currnet_data[0].display_time = (10 * currnet_data[0].display_time) / 15;
-					}
-					else
-						currnet_data[0].display_time = 0;
-					#endif
-					//break;
-				//}
-				
-			//}
-			//
-		}
-
-	}
-	// 字库
-	else if (CanDoIndexZi != CanZiIndex) {
-		CanDoIndexZi = (CanDoIndexZi + 1) & (CanMaxLength - 1);
-	}
-	// 升级
-	else if (CanDoIndexUp != CanUpIndex) {
-		CanDoIndexUp = (CanDoIndexUp + 1) & (CanMaxLength - 1);
-	}
-	
-		while(1) {
-		RxIndex = UARTMaxLength - DMA1_Channel5->CNDTR;
-		
-		if(NowIndex == RxIndex) return;
 		
 		else {
-			//if (RxBuffer[NowIndex] == 0x55)
-			//	ReturnByte(0x22);
 			#if 1
+			
 			do {
+				//开机发送： A0 07 00 00 11 27 00 00 00 00
+				//if(9 < ((RxIndex - NowIndex) & (UARTMaxLength - 1))){
+				if(
+				(0xA0 == RxBuffer_Text[(NowIndex - 9) & (UARTMaxLength_Text - 1)]) &&
+				(0x07 == RxBuffer_Text[(NowIndex - 8) & (UARTMaxLength_Text - 1)]) &&
+				(0x00 == RxBuffer_Text[(NowIndex - 7) & (UARTMaxLength_Text - 1)]) &&
+				(0x00 == RxBuffer_Text[(NowIndex - 6) & (UARTMaxLength_Text - 1)]) &&
+				(0x11 == RxBuffer_Text[(NowIndex - 5) & (UARTMaxLength_Text - 1)]) &&
+				(0x27 == RxBuffer_Text[(NowIndex - 4) & (UARTMaxLength_Text - 1)]) &&
+				(0x00 == RxBuffer_Text[(NowIndex - 3) & (UARTMaxLength_Text - 1)]) &&
+				(0x00 == RxBuffer_Text[(NowIndex - 2) & (UARTMaxLength_Text - 1)]) &&
+				(0x00 == RxBuffer_Text[(NowIndex - 1) & (UARTMaxLength_Text - 1)]) &&
+				(0x00 == RxBuffer_Text[NowIndex])) {
+					for( i = 0; i < 10;i++){
+						RxBuffer_Text[(NowIndex - i) & (UARTMaxLength_Text - 1)] = 0;
+					}
+					Updata_Text = 0;
+					for(i = 0; i < sizeof(ReceiveData_Head); i++) {
+						USART1->DR = ReceiveData_Head[i]; while((USART1->SR & 0x40) == 0);
+					}
+					for(x = 0; x < 1566; x++) {
+						USART1->DR = *(&receive_data[0].head + x); while((USART1->SR & 0x40) == 0);
+					}
+					break;
+				}
+				//发送6条文本 
+ //A0 07 52 06 F9 2A 00 00 00 00 A0 78 39 5B 8D AD
+ //3A 61 F5 01 D2 27 7C 51 70 B1 F9 3D 38 33 07 00
+				//else if( 1631 < ((RxIndex - NowIndex) & (UARTMaxLength_Text - 1))){
+					if(
+					(0xA0 == RxBuffer_Text[(NowIndex - 9) & (UARTMaxLength_Text - 1)]) &&
+					(0x07 == RxBuffer_Text[(NowIndex - 8) & (UARTMaxLength_Text - 1)]) &&
+					(0x52 == RxBuffer_Text[(NowIndex - 7) & (UARTMaxLength_Text - 1)]) &&
+					(0x06 == RxBuffer_Text[(NowIndex - 6) & (UARTMaxLength_Text - 1)]) &&
+					(0xF9 == RxBuffer_Text[(NowIndex - 5) & (UARTMaxLength_Text - 1)]) &&
+					(0x2A == RxBuffer_Text[(NowIndex - 4) & (UARTMaxLength_Text - 1)]) &&
+					(0x00 == RxBuffer_Text[(NowIndex - 3) & (UARTMaxLength_Text - 1)]) &&
+					(0x00 == RxBuffer_Text[(NowIndex - 2) & (UARTMaxLength_Text - 1)]) &&
+					(0x00 == RxBuffer_Text[(NowIndex - 1) & (UARTMaxLength_Text - 1)]) &&
+					(0x00 == RxBuffer_Text[(NowIndex - 0) & (UARTMaxLength_Text - 1)])) {
+						HeadIndex = (NowIndex - 9) & (UARTMaxLength_Text - 1);
+						Updata_Text = 1;
+						// 反馈 A0 07 00 00 09 52 00 08 46 81 
+						USART1->DR = 0xa0; while((USART1->SR & 0x40) == 0);
+						USART1->DR = 0x07; while((USART1->SR & 0x40) == 0);
+						USART1->DR = 0x00; while((USART1->SR & 0x40) == 0);
+						USART1->DR = 0x00; while((USART1->SR & 0x40) == 0);
+						USART1->DR = 0x09; while((USART1->SR & 0x40) == 0);
+						USART1->DR = 0x52; while((USART1->SR & 0x40) == 0);
+						USART1->DR = 0x00; while((USART1->SR & 0x40) == 0);
+						USART1->DR = 0x08; while((USART1->SR & 0x40) == 0);
+						USART1->DR = 0x46; while((USART1->SR & 0x40) == 0);
+						USART1->DR = 0x81; while((USART1->SR & 0x40) == 0);
+						break;
+					}
+
+				
 				// 文本开始头
-				//if( (2 != Updata) && (0x55 == RxBuffer[(NowIndex - 6) & (UARTMaxLength - 1)]) &&
+				#if 0
 				if( (0x55 == RxBuffer[(NowIndex - 6) & (UARTMaxLength - 1)]) &&
 					(0xff == RxBuffer[(NowIndex - 5) & (UARTMaxLength - 1)]) &&
 					(0x55 == RxBuffer[(NowIndex - 4) & (UARTMaxLength - 1)]) &&
@@ -971,25 +276,27 @@ void Communication(void)
 					Updata = 1;
 					break;
 				}
+				#endif
 				// 升级程序开始头
-				#if 1
+				#if 0
 				else if(0xa5 == RxBuffer[NowIndex] && (1 != Updata))
 				{
 					HeadIndex = NowIndex;
 					Updata = 2;
 					break;
 				}
+				#endif
 				// 字库开始头
-				
-				else if((0x55 == RxBuffer[(NowIndex - 5) & (UARTMaxLength - 1)]) &&
-						(0xff == RxBuffer[(NowIndex - 4) & (UARTMaxLength - 1)]) &&
-						(0x55 == RxBuffer[(NowIndex - 3) & (UARTMaxLength - 1)]) &&
-						(0xff == RxBuffer[(NowIndex - 2) & (UARTMaxLength - 1)]) &&
-						(0x00 == RxBuffer[(NowIndex - 1) & (UARTMaxLength - 1)]) &&
-						(0xab == RxBuffer[NowIndex]))
+				#if 0
+				else if((0x55 == RxBuffer_Text[(NowIndex - 5) & (UARTMaxLength_Text - 1)]) &&
+						(0xff == RxBuffer_Text[(NowIndex - 4) & (UARTMaxLength_Text - 1)]) &&
+						(0x55 == RxBuffer_Text[(NowIndex - 3) & (UARTMaxLength_Text - 1)]) &&
+						(0xff == RxBuffer_Text[(NowIndex - 2) & (UARTMaxLength_Text - 1)]) &&
+						(0x00 == RxBuffer_Text[(NowIndex - 1) & (UARTMaxLength_Text - 1)]) &&
+						(0xab == RxBuffer_Text[NowIndex]))
 				{
 					TIM_Cmd(TIM2, DISABLE);
-					OffDisplay();					//关显示
+					OffDisplay;					//关显示
 					
 					
 					// 
@@ -1041,40 +348,28 @@ void Communication(void)
 				#endif
 				//
 				// 没有开始头
-				if(1 != Updata) break;
+				if(1 != Updata_Text) break;
+
 				
-				// 结束标识 //
-// 				if(((1 == Updata) && ((0xFF != RxBuffer[(NowIndex - 3) & (UARTMaxLength - 1)]) ||
-// 					(0x27 != RxBuffer[(NowIndex - 2) & (UARTMaxLength - 1)]) || 
-// 					(0xFF != RxBuffer[(NowIndex - 1) & (UARTMaxLength - 1)]) ||
-// 					(0x28 != RxBuffer[NowIndex])) )
-// 					|| 
-// 					((2 == Updata) && (0xae != RxBuffer[NowIndex])))
-				if( (0xFF != RxBuffer[(NowIndex - 3) & (UARTMaxLength - 1)]) ||
-					(0x27 != RxBuffer[(NowIndex - 2) & (UARTMaxLength - 1)]) || 
-					(0xFF != RxBuffer[(NowIndex - 1) & (UARTMaxLength - 1)]) ||
-					(0x28 != RxBuffer[NowIndex]) )
-				{
-					break;
+				x = (NowIndex - HeadIndex) & (UARTMaxLength_Text - 1);
+				if(x < 1631) break;
+				if(
+						(0xA0 == RxBuffer_Text[(NowIndex - 1631) & (UARTMaxLength_Text - 1)]) &&
+						(0x07 == RxBuffer_Text[(NowIndex - 1630) & (UARTMaxLength_Text - 1)]) &&
+						(0x52 == RxBuffer_Text[(NowIndex - 1629) & (UARTMaxLength_Text - 1)]) &&
+						(0x06 == RxBuffer_Text[(NowIndex - 1628) & (UARTMaxLength_Text - 1)]) &&
+						(0xF9 == RxBuffer_Text[(NowIndex - 1627) & (UARTMaxLength_Text - 1)]) &&
+						(0x2A == RxBuffer_Text[(NowIndex - 1626) & (UARTMaxLength_Text - 1)])) {
+							
+						for (x = 0; x < sizeof(receive_data); x++) {
+							*(&receive_data[0].head + x) = RxBuffer_Text[(NowIndex - 1565 + x) & (UARTMaxLength_Text - 1)];
+						}
+						receive_update = 1;
 				}
-				
-				
-				
-				x = (NowIndex - HeadIndex) & (UARTMaxLength - 1);
-				if     ((1 == Updata) && ((x <= 8) || (x >= 0x4000 ))) break;
-				else if((2 == Updata) && ((x <= 8) || (x >= 600  ))) break;
-				//长度不符合
-// 				if     ((1 == Updata) && (((NowIndex - HeadIndex) <= 8) ||  ((NowIndex - HeadIndex) & (UARTMaxLength - 1)) >= 1030)) break;
-// 				else if((2 == Updata) && (((NowIndex - HeadIndex) <= 8) ||  ((NowIndex - HeadIndex) & (UARTMaxLength - 1)) >= 600)) break;
-				
-				// 有文本内容更新
-				if(1 == Updata)
-				{
-					x = ((uint16_t)RxBuffer[(HeadIndex + 8) & (UARTMaxLength - 1)] << 8) + RxBuffer[(HeadIndex + 9) & (UARTMaxLength - 1)];
-					UpText(x);
-				}
+				Updata_Text = 0;
+
 				// 升级
-				#if 1
+				#if 0
 				else if(2 == Updata)
 				{
 					x = (HeadIndex + 1)  & (UARTMaxLength - 1);
@@ -1096,20 +391,933 @@ void Communication(void)
 					UpGrade(y);
 				}
 				#endif
-				Updata = 0;
+				
 			}while(0);
 			
 			#endif
 		}
-		
-		NowIndex = (NowIndex + 1) & (UARTMaxLength - 1);
-//		NowIndex = (NowIndex + 1) & (0x800 - 1);
-	
+		//ReturnByte(RxBuffer[NowIndex]);
+		NowIndex = (NowIndex + 1) & (UARTMaxLength_Text - 1);
+
 	}
 
+}
+void do_update_receive(void)
+{
+	u16 x;
+	u8 i,j,ret;
+	u8 *p,*pp;
+	/*
+	head节目开始头： 01
+	tpye节目类型：00 文本 01 时间  02 时速 03 日期
+	donghua动画方式：00 直接显示   01 向左   02 向右   03 向上   04 向下   05左中右
+	speed动画速度：0~100
+	time停留时间：0~100
+	text[256]
+	*/
+	if(receive_update == 0) return;
+	receive_update = 0;
+	
+	NeedGPS = 0;
+	text_flag = 0;
+	text_index = 0;
+
+	for(i = 0; i < 6; i++){
+		if(1 != receive_data[i].head) continue;
+		
+		text_flag++;
+		
+		if(0 != receive_data[i].tpye)
+			NeedGPS = 1;
+	}
+	
+	
+	for(i = 0; i < 6; i++){
+		if(1 == receive_data[i].head) {
+			
+			text_index = i;
+			//if(DisplayIndex) {p = DisplayBuf0;pp=DisplayBuf1;}
+			//else             {p = DisplayBuf1;pp= DisplayBuf0;}
+			//for (x = 0; x < DisplayBufMaxLength; x++){
+			//	upturn_buf[x] = 0;
+			//}
+			break;
+		}
+	}
+
+	if(text_flag){
+		//if(!NeedGPS)
+		//	USART_ITConfig(USART3, USART_IT_RXNE, DISABLE);
+		//else
+		//	USART_ITConfig(USART3, USART_IT_RXNE, ENABLE);
+		// 静止
+		if(0 == receive_data[text_index].donghua){
+			sys_move = 0;
+			ret = receive_data[text_index].tpye;
+			// 文本
+			if(!ret){
+				diplay_data.text_index = 0;
+				diplay_data.length = 0;
+				for(x = 0; x < 256; x++){
+					if(receive_data[text_index].text[x])
+						diplay_data.length++;
+				}
+				do_text();
+			}
+			// 时间
+			else if (1 == ret){
+				do_time();
+			}
+			// 速度
+			else if (2 == ret){
+				do_speed();
+			}
+				
+			// 日期
+			else if (3 == ret){
+				do_data();
+			}
+		}
+		// 非静止
+		#if 1
+		//else if(1 == receive_data[text_index].donghua)
+		else
+		{
+			if(DisplayIndex) {p = &DisplayBuf1[0]; pp = &DisplayBuf0[0];}
+			else             {p = &DisplayBuf0[0]; pp = &DisplayBuf1[0];}
+			for (x = 0; x < DisplayBufMaxLength; x++)
+				*(p + x) = 0;
+			
+			DisplayIndex = (DisplayIndex + 1) & 1;
+			for (x = 0; x < DisplayBufMaxLength; x++)
+				*(pp + x) = 0;
+
+			do_load_move();
+		}
+		#endif
+	}
+	time_upindex = 0;
+	time_upsec = 0;
 
 }
+
+void do_chaoshi(void)
+{
+	u8 i,j,ret;
+	u16 x;
+	
+	
+	time_upindex = 0;
+	time_upsec = 0;
+	#if 0
+	USART1->DR = 0x2A; while((USART1->SR & 0x40) == 0);
+	USART1->DR = text_index; while((USART1->SR & 0x40) == 0);
+	USART1->DR = receive_data[0].tpye; while((USART1->SR & 0x40) == 0);
+	USART1->DR = 0x2A; while((USART1->SR & 0x40) == 0);
+	#endif
+	
+	// 文本   
+	if(!receive_data[text_index].tpye){
+		// 静止  长度没超
+		if(!receive_data[text_index].donghua && diplay_data.text_index < diplay_data.length)
+		{
+			do_text();
+			return;
+		}
+		// 上翻下翻 长度没超
+		//else if((3 == receive_data[text_index].donghua && MovetextNum < diplay_data.length) || \
+		//		(4 == receive_data[text_index].donghua && MovetextNum < diplay_data.length))
+		else if(receive_data[text_index].donghua > 2 && MovetextNum < diplay_data.length)
+		{
+			sys_move = 1;
+
+			MoveIndex     = 0;							// 移动计数，满8位加载下一个文字
+//			MovetextNum   = 0;							// 移动第几个字节
+			time_upindex = 0;
+			time_upsec = 0;
+			do_load_up();
+			// 加载一下屏显示
+			return;
+		}
+		else if(1)
+		{
+			
+		}
+	}
+	
+	for(i = 1; i < 7; i++)
+	{
+		ret = text_index + i;
+		if( ret > 5)
+			ret -= 6;
+			
+		if(receive_data[ret].head)
+		{
+			text_index = ret;
+			
+			if(0 == receive_data[text_index].donghua){
+				sys_move = 0;
+				ret = receive_data[text_index].tpye;
+				if(1 == ret){
+					do_time();
+				}
+				if(2 == ret){
+					do_speed();
+				}
+				if(3 == ret){
+					do_data();
+				}
+				if(0 == ret){
+					diplay_data.text_index = 0;
+					diplay_data.length = 0;
+					for(x = 0; x < 256; x++){
+						if(receive_data[text_index].text[x])
+							diplay_data.length++;
+					}
+					do_text();
+				}
+			}
+			#if 1
+			//else if(1 == receive_data[text_index].donghua)
+			else
+			{
+				do_load_move();
+			}
+			#endif
+			
+			break;
+		}
+	}
+}
 //
+void check_timeout(void)
+{
+	u8 text[12], ret, i,j;
+	u8 *p,*pp;
+
+	if(DisplayIndex) {p = DisplayBuf0;pp=DisplayBuf1;}
+	else             {p = DisplayBuf1;pp= DisplayBuf0;}
+
+	for(i = 0; i < 12; i++)
+	{
+		text[i] = const_word[i];//
+
+	}
+	ret = CheckFile(p, text, 12);
+	DisplayIndex = (DisplayIndex + 1 ) &1;
+	time_upindex = 0;
+	time_upsec = 0;
+	while(time_upsec < 5){
+		
+	}
+}
+
+//
+// 移动前配置信息
+void do_load_move(void)
+{
+	u16 x;
+	u8 i,j,ret;
+	#if 1
+	//tpye 00 文本 01 时间  02 时速 03 日期
+	ret = receive_data[text_index].tpye;
+	if(ret == 0) { // 文本
+		diplay_data.text_GB_flag = 0;
+		diplay_data.length = 0;
+		for(x = 0; x < 256; x++){
+			if(receive_data[text_index].text[x])
+				diplay_data.length++;
+		}
+		// 文本没达一屏
+		for(; x < ScreenLength; x++){
+			receive_data[text_index].text[x] = 0x20;
+		}
+		#if 1
+		if(diplay_data.length > ScreenLength){
+			//for(x = 0; x < diplay_data.length; x++){
+			j = 0;
+			if(receive_data[text_index].donghua == 1){
+				for(i=1;i<13;i++){
+					if(receive_data[text_index].text[diplay_data.length - i] < 0x7f)
+						j++;
+				}
+				if((j % 2) && (receive_data[text_index].text[diplay_data.length - 12] > 0x7f))
+					diplay_data.text_GB_flag = 1;
+			}
+			else if(receive_data[text_index].donghua == 2){
+				for(i=0;i<12;i++){
+					if(receive_data[text_index].text[i] < 0x7f)
+						j++;
+				}
+				if((j % 2) && (receive_data[text_index].text[0] > 0x7f))
+					diplay_data.text_GB_flag = 1;
+			}
+		}
+		#endif
+	}
+	// 时间
+	else if(1 == ret) {
+		diplay_data.length = 12;
+		diplay_data.gps_text[0]= 0x20;
+		diplay_data.gps_text[1] = 0x20;
+		diplay_data.gps_text[2] = gps_date.time_hour_H;
+		diplay_data.gps_text[3] = gps_date.time_hour_L;
+		diplay_data.gps_text[4] = 0x3A;
+		diplay_data.gps_text[5] = gps_date.time_munute_H;
+		diplay_data.gps_text[6] = gps_date.time_munute_L;
+		diplay_data.gps_text[7] = 0x3A;
+		diplay_data.gps_text[8] = gps_date.time_second_H;
+		diplay_data.gps_text[9] = gps_date.time_second_L;
+		diplay_data.gps_text[10] = 0x20;
+		diplay_data.gps_text[11] = 0x20;	
+	}
+	
+	// 时速
+	else if(2 == ret) {
+		diplay_data.length = 12;
+		diplay_data.gps_text[0] = 0xCA;
+		diplay_data.gps_text[1] = 0xB1;
+		diplay_data.gps_text[2] = 0xCB;
+		diplay_data.gps_text[3] = 0xD9;
+		
+		diplay_data.gps_text[4] = 0x3A;
+		diplay_data.gps_text[5] = gps_date.speed_H;
+		diplay_data.gps_text[6] = gps_date.speed_M;
+		diplay_data.gps_text[7] = gps_date.speed_L;
+		
+		diplay_data.gps_text[8] = 'k';
+		diplay_data.gps_text[9] = 'm';
+		diplay_data.gps_text[10] = '/';
+		diplay_data.gps_text[11] = 'h';
+	}
+	// 日期
+	else if(3 == ret) {
+		diplay_data.length = 12;
+		diplay_data.gps_text[0] = gps_date.date_year_H;
+		diplay_data.gps_text[1] = gps_date.date_year_L;
+		diplay_data.gps_text[2] = 0xC4;
+		diplay_data.gps_text[3] = 0xEA;
+		
+		diplay_data.gps_text[4] = gps_date.date_month_H;
+		diplay_data.gps_text[5] = gps_date.date_month_L;
+		diplay_data.gps_text[6] = 0xD4;
+		diplay_data.gps_text[7] = 0xC2;
+		
+		diplay_data.gps_text[8] = gps_date.date_day_H;
+		diplay_data.gps_text[9] = gps_date.date_day_L;
+		diplay_data.gps_text[10] = 0xC8;
+		diplay_data.gps_text[11] = 0xD5;
+	}
+	
+	speed_num = 0x10;
+	if(receive_data[text_index].speed) {
+		if(receive_data[text_index].speed>10)
+			speed_num = 0x2000;
+		else if(receive_data[text_index].speed>2){
+			speed_num +=  (u16)4 << (receive_data[text_index].speed - 1);
+		}
+	}
+	#endif
+	sys_move = 1;
+	
+	MoveIndex     = 0;							// 移动计数，满8位加载下一个文字
+	Move_LoadGB   = 0;							// 当前移动字符是GB2312(1)或ASCII(0)
+	MovetextNum   = 0;							// 移动第几个字节
+
+	ret = receive_data[text_index].donghua;
+
+	//  01 向左   02 向右   03 向上   04 向下   05 飘雪 06 左中右
+	if(1 == ret || 2 == ret){
+	}
+	// 向上
+	//else if(3 == ret){
+	else{
+		do_load_up();
+	}
+	
+}
+
+
+void check_timeout2(u8 *test,u8 len)
+{
+	u16 x;
+	u8 ret;
+	u8 *p,*pp;
+		
+		if(DisplayIndex) {p = DisplayBuf0;pp=DisplayBuf1;}
+		else             {p = DisplayBuf1;pp= DisplayBuf0;}
+		//for (x = 0; x < DisplayBufMaxLength; x++){
+		//	*(p + x )  = 0;
+		//}
+
+
+		ret = CheckFile(p, test, len);
+		
+		DisplayIndex = (DisplayIndex + 1 ) &1;
+		for (x = 0; x < DisplayBufMaxLength; x++){
+			*(pp + x)  = *(p + x);
+		}
+		delay_ms(100);
+		//USART1->DR = 0xff; while((USART1->SR & 0x40) == 0);
+}
+
+
+//
+#if 1
+void MoveWordLine_text(void)
+{
+	//  01 向左   02 向右   03 向上   04 向下   05 飘雪 06 左中右
+	if(1 == receive_data[text_index].donghua)
+		Move_text_left();
+	
+		// 右移
+	else if(2 == receive_data[text_index].donghua){
+		Move_text_right();
+	}
+	// 向上
+	else if(3 == receive_data[text_index].donghua){
+		Move_Up();
+	}
+	// 向下
+	else if(4 == receive_data[text_index].donghua){
+		Move_Down();
+	}
+	// 飘雪
+	else if(5 == receive_data[text_index].donghua){
+		Move_piaoxue();
+	}
+	// 左中右
+	else if(6 == receive_data[text_index].donghua){
+		Move_LMR();
+	}
+}
+
+
+void Move_text_left(void)
+{
+	uint8_t  i,j,z;
+	uint8_t  h,l;
+	uint16_t x;
+	uint8_t  *p,*pp;
+//	uint8_t  *word_p;
+	uint8_t temp[8] = {0,0,0,0,0,0,0,0};
+
+	if (!Bemove)
+		return;
+	
+	Bemove = 0;
+	
+	if(DisplayIndex) {p = &DisplayBuf0[0]; pp = &DisplayBuf1[0];}// 	if(DisplayIndex)  p = DisplayBuf0, pp = DisplayBuf1;
+	else             {p = &DisplayBuf1[0]; pp = &DisplayBuf0[0];}// 	else              p = DisplayBuf1, pp = DisplayBuf0;
+	
+	if(!MoveIndex)
+	{
+		if(MovetextNum < diplay_data.length)
+		{
+			if(!Move_LoadGB)
+			{
+				h = receive_data[text_index].text[MovetextNum];
+
+				if(h < 0xA1)
+				{
+					LoadChar(MoveBuf, (u16)h);
+				}
+				else
+				{
+					l = receive_data[text_index].text[MovetextNum + 1];
+					LoadChar(MoveBuf, ((u16)h << 8) | l);
+					Move_LoadGB = 1;
+				}
+			}
+			else
+			{
+				Move_LoadGB = 0;
+				for(i = 0; i < 128; i++)
+				{
+					MoveBuf[i] = MoveBuf[i + 128];
+				}
+			}
+		}
+		else
+		{
+			for(i = 0; i < 128; i++)
+				MoveBuf[i] = 0;
+		}
+		
+	}
+	
+	for(i = 0; i < 16; i++)
+	{
+		x = i*8;
+		for(j = 0; j < ScreenLength - 1; j++)
+		{
+			*(p + x)       = *(p + x + 1);
+			*(p + x + 1) = *(p + x + 2);
+			*(p + x + 2) = *(p + x + 3);
+			*(p + x + 3) = *(p + x + 4);
+			*(p + x + 4) = *(p + x + 5);
+			*(p + x + 5) = *(p + x + 6);
+			*(p + x + 6) = *(p + x + 7);
+			*(p + x + 7) = *(p + x + 128);
+			x += 128;
+		}
+		*(p + x)       = *(p + x + 1);
+		*(p + x + 1) = *(p + x + 2);
+		*(p + x + 2) = *(p + x + 3);
+		*(p + x + 3) = *(p + x + 4);
+		*(p + x + 4) = *(p + x + 5);
+		*(p + x + 5) = *(p + x + 6);
+		*(p + x + 6) = *(p + x + 7);
+		*(p + x + 7) = MoveBuf[i*8];
+		
+		MoveBuf[i*8]       = MoveBuf[i*8 + 1];
+		MoveBuf[i*8 + 1] = MoveBuf[i*8 + 2];
+		MoveBuf[i*8 + 2] = MoveBuf[i*8 + 3];
+		MoveBuf[i*8 + 3] = MoveBuf[i*8 + 4];
+		MoveBuf[i*8 + 4] = MoveBuf[i*8 + 5];
+		MoveBuf[i*8 + 5] = MoveBuf[i*8 + 6];
+		MoveBuf[i*8 + 6] = MoveBuf[i*8 + 7];
+		MoveBuf[i*8 + 7] = 0;
+	}
+	
+	//交换显示区
+	DisplayIndex = (DisplayIndex + 1) & 1;
+	
+	for (x = 0; x < DisplayBufMaxLength; x++)
+		 *(pp + x) = *(p + x);
+	//
+	if(++MoveIndex >= 8)
+	{
+		MoveIndex = 0;
+		if(++MovetextNum >= (diplay_data.length))
+		{
+			if(diplay_data.text_GB_flag){
+				diplay_data.text_GB_flag = 0;
+				return;
+			}
+			time_upindex = 0;
+			time_upsec = 0;
+			sys_move = 0;
+			//delay_ms(100);
+		}
+	}
+}
+
+void Move_text_right(void)
+{
+	uint8_t  i,j,z;
+	uint8_t  h,l;
+	uint16_t x;
+	uint8_t  *p,*pp;
+//	uint8_t  *word_p;
+	uint8_t temp[8] = {0,0,0,0,0,0,0,0};
+
+	if (!Bemove)
+		return;
+	
+	Bemove = 0;
+	
+	if(DisplayIndex) {p = &DisplayBuf0[0]; pp = &DisplayBuf1[0];}// 	if(DisplayIndex)  p = DisplayBuf0, pp = DisplayBuf1;
+	else             {p = &DisplayBuf1[0]; pp = &DisplayBuf0[0];}// 	else              p = DisplayBuf1, pp = DisplayBuf0;
+	
+	if(!MoveIndex)
+	{
+		if(MovetextNum < diplay_data.length)
+		{
+			if(!Move_LoadGB)
+			{
+				h = receive_data[text_index].text[diplay_data.length - MovetextNum - 1];
+
+				if(h < 0xA1)
+				{
+					LoadChar(MoveBuf, (u16)h);
+					for(i = 0; i < 128; i++)
+							MoveBuf[i + 128] = MoveBuf[i];
+				}
+				else
+				{
+					if(diplay_data.length - MovetextNum - 1 != 0){
+						l = receive_data[text_index].text[diplay_data.length - MovetextNum - 2];
+						LoadChar(MoveBuf, ((u16)l << 8) | h);
+						Move_LoadGB = 1;
+					}
+					else{
+						for(i = 0; i < 128; i++)
+							MoveBuf[i + 128] = 0;
+					}
+				}
+			}
+			else
+			{
+				Move_LoadGB = 0;
+				for(i = 0; i < 128; i++)
+				{
+					MoveBuf[i + 128] = MoveBuf[i];
+				}
+			}
+		}
+		else
+		{
+			for(i = 0; i < 128; i++)
+				MoveBuf[i + 128] = 0;
+		}
+		
+	}
+	
+	for(i = 0; i < 16; i++)
+	{
+		x = (1408 + 7) + i*8;
+		//x = i*8;
+		for(j = 0; j < ScreenLength - 1; j++)
+		{
+			*(p + x)       = *(p + x -1);
+			*(p + x - 1) = *(p + x - 2);
+			*(p + x - 2) = *(p + x - 3);
+			*(p + x - 3) = *(p + x - 4);
+			*(p + x - 4) = *(p + x - 5);
+			*(p + x - 5) = *(p + x - 6);
+			*(p + x - 6) = *(p + x - 7);
+			*(p + x - 7) = *(p + x - 128);
+			x -= 128;
+		}
+		*(p + x)     = *(p + x - 1);
+		*(p + x - 1) = *(p + x - 2);
+		*(p + x - 2) = *(p + x - 3);
+		*(p + x - 3) = *(p + x - 4);
+		*(p + x - 4) = *(p + x - 5);
+		*(p + x - 5) = *(p + x - 6);
+		*(p + x - 6) = *(p + x - 7);
+		*(p + x - 7) = MoveBuf[i*8 + 7 + 128];
+		
+		MoveBuf[i*8 + 7 + 128] = MoveBuf[i*8 + 6 + 128];
+		MoveBuf[i*8 + 6 + 128] = MoveBuf[i*8 + 5 + 128];
+		MoveBuf[i*8 + 5 + 128] = MoveBuf[i*8 + 4 + 128];
+		MoveBuf[i*8 + 4 + 128] = MoveBuf[i*8 + 3 + 128];
+		MoveBuf[i*8 + 3 + 128] = MoveBuf[i*8 + 2 + 128];
+		MoveBuf[i*8 + 2 + 128] = MoveBuf[i*8 + 1 + 128];
+		MoveBuf[i*8 + 1 + 128] = MoveBuf[i*8  + 128];
+		MoveBuf[i*8 + 128] = 0;
+	}
+	
+	//交换显示区
+	DisplayIndex = (DisplayIndex + 1) & 1;
+	
+	for (x = 0; x < DisplayBufMaxLength; x++)
+		 *(pp + x) = *(p + x);
+	//
+	if(++MoveIndex >= 8)
+	{
+		MoveIndex = 0;
+		if(++MovetextNum >= (diplay_data.length))
+		{
+			if(diplay_data.text_GB_flag){
+				diplay_data.text_GB_flag = 0;
+				return;
+			}
+			time_upindex = 0;
+			time_upsec = 0;
+			sys_move = 0;
+			//delay_ms(100);
+		}
+	}
+}
+
+
+
+
+#endif
+
+#if 1
+void MoveWordLine_gps(void)
+{
+	//  01 向左   02 向右   03 向上   04 向下   05 飘雪 06 左中右
+	if(1 == receive_data[text_index].donghua){
+		Move_gps_left();
+	}
+	// 右移
+	else if(2 == receive_data[text_index].donghua){
+		Move_gps_right();
+	}
+	// 向上
+	else if(3 == receive_data[text_index].donghua){
+		
+		Move_Up();
+	}
+	// 向下
+	else if(4 == receive_data[text_index].donghua){
+		Move_Down();
+	}
+	// 飘雪
+	else if(5 == receive_data[text_index].donghua){
+		Move_piaoxue();
+	}
+	// 左中右
+	else if(6 == receive_data[text_index].donghua){
+		Move_LMR();
+	}
+
+}
+#endif
+void Move_gps_left(void)
+{
+	uint8_t  i,j,z;
+	uint8_t  h,l;
+	uint16_t x;
+	uint8_t  *p,*pp;
+//	uint8_t  *word_p;
+
+	if (!Bemove)
+		return;
+	
+	Bemove = 0;
+	
+	if(DisplayIndex) {p = &DisplayBuf0[0]; pp = &DisplayBuf1[0];}
+	else             {p = &DisplayBuf1[0]; pp = &DisplayBuf0[0];}
+	
+	if(!MoveIndex)
+	{
+		if(MovetextNum < diplay_data.length)
+		{
+			if(!Move_LoadGB)
+			{
+				h = diplay_data.gps_text[MovetextNum];
+
+				if(h < 0xA1)
+				{
+					LoadChar(MoveBuf, (u16)h);
+				}
+				else
+				{
+					l = diplay_data.gps_text[MovetextNum + 1];
+					LoadChar(MoveBuf, ((u16)h << 8) | l);
+					Move_LoadGB = 1;
+				}
+			}
+			else
+			{
+				Move_LoadGB = 0;
+				for(i = 0; i < 128; i++)
+				{
+					MoveBuf[i] = MoveBuf[i + 128];
+				}
+			}
+		}
+		else
+		{
+			for(i = 0; i < 128; i++)
+				MoveBuf[i] = 0;
+		}
+		
+	}
+	
+	for(i = 0; i < 16; i++)
+	{
+		x = i*8;
+		for(j = 0; j < ScreenLength - 1; j++)
+		{
+			*(p + x)       = *(p + x + 1);
+			*(p + x + 1) = *(p + x + 2);
+			*(p + x + 2) = *(p + x + 3);
+			*(p + x + 3) = *(p + x + 4);
+			*(p + x + 4) = *(p + x + 5);
+			*(p + x + 5) = *(p + x + 6);
+			*(p + x + 6) = *(p + x + 7);
+			*(p + x + 7) = *(p + x + 128);
+			x += 128;
+		}
+		*(p + x)       = *(p + x + 1);
+		*(p + x + 1) = *(p + x + 2);
+		*(p + x + 2) = *(p + x + 3);
+		*(p + x + 3) = *(p + x + 4);
+		*(p + x + 4) = *(p + x + 5);
+		*(p + x + 5) = *(p + x + 6);
+		*(p + x + 6) = *(p + x + 7);
+		*(p + x + 7) = MoveBuf[i*8];
+		
+		MoveBuf[i*8]     = MoveBuf[i*8 + 1];
+		MoveBuf[i*8 + 1] = MoveBuf[i*8 + 2];
+		MoveBuf[i*8 + 2] = MoveBuf[i*8 + 3];
+		MoveBuf[i*8 + 3] = MoveBuf[i*8 + 4];
+		MoveBuf[i*8 + 4] = MoveBuf[i*8 + 5];
+		MoveBuf[i*8 + 5] = MoveBuf[i*8 + 6];
+		MoveBuf[i*8 + 6] = MoveBuf[i*8 + 7];
+		MoveBuf[i*8 + 7] = 0;
+	}
+	
+	//交换显示区
+	DisplayIndex = (DisplayIndex + 1) & 1;
+	
+	for (x = 0; x < DisplayBufMaxLength; x++)
+		 *(pp + x) = *(p + x);
+	//
+	if(++MoveIndex >= 8)
+	{
+		MoveIndex = 0;
+		if(++MovetextNum >= (diplay_data.length))
+		{
+			time_upindex = 0;
+			time_upsec = 0;
+			sys_move = 0;
+		}
+	}
+}
+
+#if 1
+void Move_gps_right(void)
+{
+	uint8_t  i,j,z;
+	uint8_t  h,l;
+	uint16_t x;
+	uint8_t  *p,*pp;
+//	uint8_t  *word_p;
+
+	if (!Bemove)
+		return;
+	
+	Bemove = 0;
+	
+	if(DisplayIndex) {p = &DisplayBuf0[0]; pp = &DisplayBuf1[0];}
+	else             {p = &DisplayBuf1[0]; pp = &DisplayBuf0[0];}
+	
+	if(!MoveIndex)
+	{
+		if(MovetextNum < diplay_data.length)
+		{
+			if(!Move_LoadGB)
+			{
+				h = diplay_data.gps_text[diplay_data.length - MovetextNum - 1];
+
+				if(h < 0xA1)
+				{
+					LoadChar(MoveBuf, (u16)h);
+					for(i = 0; i < 128; i++)
+					{
+						MoveBuf[i + 128] = MoveBuf[i];
+					}
+				}
+				else
+				{
+					if(diplay_data.length - MovetextNum - 1 != 0){
+						l = diplay_data.gps_text[diplay_data.length - MovetextNum - 2];
+						LoadChar(MoveBuf, ((u16)l << 8) | h);
+						Move_LoadGB = 1;
+					}
+					else {
+						for(i = 0; i < 128; i++)
+							MoveBuf[i + 128] = 0;
+					}
+				}
+			}
+			else
+			{
+				Move_LoadGB = 0;
+				for(i = 0; i < 128; i++)
+				{
+					MoveBuf[i + 128] = MoveBuf[i];
+				}
+			}
+		}
+		else
+		{
+			for(i = 0; i < 128; i++)
+				MoveBuf[i + 128] = 0;
+		}
+		
+	}
+	
+	for(i = 0; i < 16; i++)
+	{
+		x = (1408 + 7) + i*8;
+		//x = i*8;
+		for(j = 0; j < ScreenLength - 1; j++)
+		{
+			*(p + x)       = *(p + x -1);
+			*(p + x - 1) = *(p + x - 2);
+			*(p + x - 2) = *(p + x - 3);
+			*(p + x - 3) = *(p + x - 4);
+			*(p + x - 4) = *(p + x - 5);
+			*(p + x - 5) = *(p + x - 6);
+			*(p + x - 6) = *(p + x - 7);
+			*(p + x - 7) = *(p + x - 128);
+			x -= 128;
+		}
+		*(p + x)     = *(p + x - 1);
+		*(p + x - 1) = *(p + x - 2);
+		*(p + x - 2) = *(p + x - 3);
+		*(p + x - 3) = *(p + x - 4);
+		*(p + x - 4) = *(p + x - 5);
+		*(p + x - 5) = *(p + x - 6);
+		*(p + x - 6) = *(p + x - 7);
+		*(p + x - 7) = MoveBuf[i*8 + 7 + 128];
+		
+		MoveBuf[i*8 + 7 + 128] = MoveBuf[i*8 + 6 + 128];
+		MoveBuf[i*8 + 6 + 128] = MoveBuf[i*8 + 5 + 128];
+		MoveBuf[i*8 + 5 + 128] = MoveBuf[i*8 + 4 + 128];
+		MoveBuf[i*8 + 4 + 128] = MoveBuf[i*8 + 3 + 128];
+		MoveBuf[i*8 + 3 + 128] = MoveBuf[i*8 + 2 + 128];
+		MoveBuf[i*8 + 2 + 128] = MoveBuf[i*8 + 1 + 128];
+		MoveBuf[i*8 + 1 + 128] = MoveBuf[i*8  + 128];
+		MoveBuf[i*8 + 128] = 0;
+	}
+	
+	//交换显示区
+	DisplayIndex = (DisplayIndex + 1) & 1;
+	
+	for (x = 0; x < DisplayBufMaxLength; x++)
+		 *(pp + x) = *(p + x);
+	//
+	if(++MoveIndex >= 8)
+	{
+		MoveIndex = 0;
+		if(++MovetextNum >= (diplay_data.length))
+		{
+			time_upindex = 0;
+			time_upsec = 0;
+			sys_move = 0;
+		}
+	}
+}
+
+#endif
+
+/*
+	head节目开始头： 01
+	tpye节目类型：00 文本 01 时间  02 时速 03 日期
+	donghua动画方式：00 直接显示   01 向左   02 向右   03 向上   04 向下   05左中右
+	speed动画速度：0~100
+	time停留时间：0~100
+	text[256]
+	*/
+
+
+void do_save_receive(void)
+{
+	uint8_t  i;
+	uint16_t x;
+	__disable_irq();
+	OffDisplay;
+	WRDI();WREN(); Sector_Erase(PromptSartAddr1); Wait_Busy();
+	WRDI();WREN(); Sector_Erase(PromptSartAddr2); Wait_Busy();
+	
+	for(i = 0; i < sizeof(ReceiveData_Head); i++) 
+	{
+		WREN();
+		Byte_Program(ReceiveData_Head[i], PromptSartAddr1 + i);
+		Wait_Busy();
+	}
+	for(x = 0; x < 1566; x++)
+	{
+		WREN();
+		Byte_Program( *(&receive_data[0].head + x), PromptSartAddr2 + x );
+		Wait_Busy();
+	}
+	
+	//NVIC_SystemReset(); 	// 系统复位
+	__enable_irq();	
+}
+
+
+#if 0
 void UpText(uint16_t len)
 {
 	uint8_t  i, XOR;
@@ -1128,7 +1336,7 @@ void UpText(uint16_t len)
 	if(0xA1 == RxBuffer[(HeadIndex + 7) & ((UARTMaxLength - 1))] )
 	{
 		__disable_irq();
-		OffDisplay();					//关显示
+		OffDisplay;					//关显示
 		addr = PictureStartAddr + (RxBuffer[(HeadIndex + 10) & ((UARTMaxLength - 1))] - 1) * 0x4000;
 		WREN();Sector_Erase(addr);         Wait_Busy();
 		WREN();Sector_Erase(addr + 0x1000);Wait_Busy();
@@ -1170,7 +1378,7 @@ void UpText(uint16_t len)
 		addr = LightAddr;
 		//
 		__disable_irq();
-		OffDisplay();					//关显示
+		OffDisplay;					//关显示
 		//
 		WREN();
 		Sector_Erase(addr);
@@ -1194,7 +1402,7 @@ void UpText(uint16_t len)
 		addr = IDAddr;
 		//
 		__disable_irq();
-		OffDisplay();					//关显示
+		OffDisplay;					//关显示
 		//
 		WREN();
 		Sector_Erase(addr);
@@ -1218,64 +1426,14 @@ void UpText(uint16_t len)
 		ReturnByte(ID);
 	}
 }
-//
-void ReturnText(uint8_t ret)
-{
-	uint8_t  returnbuf[7];
-	uint16_t crc16;
-	
-	returnbuf[0] = RxBuffer[(HeadIndex + 1) & (UARTMaxLength - 1)];
-	returnbuf[1] = RxBuffer[(HeadIndex + 2) & (UARTMaxLength - 1)];
-	returnbuf[2] = RxBuffer[(HeadIndex + 3) & (UARTMaxLength - 1)];
-	returnbuf[3] = RxBuffer[(HeadIndex + 4) & (UARTMaxLength - 1)];
-	returnbuf[4] = 0;
-	returnbuf[5] = 1;
-	returnbuf[6] = ret;
-	
-	crc16 = CRC_16_pData(returnbuf,7);
-	
-	USART1->DR = 0x7e;	                        //开始码	
-	while((USART1->SR & 0x40) == 0);
-	
-	
-	USART1->DR = returnbuf[0];
-	while((USART1->SR & 0x40) == 0);
-	
-	USART1->DR = returnbuf[1];
-	while((USART1->SR & 0x40) == 0);
-	
-	USART1->DR = returnbuf[2];
-	while((USART1->SR & 0x40) == 0);
-	
-	USART1->DR = returnbuf[3];
-	while((USART1->SR & 0x40) == 0);
-	
-	USART1->DR = returnbuf[4];
-	while((USART1->SR & 0x40) == 0);
-	
-	USART1->DR = returnbuf[5];
-	while((USART1->SR & 0x40) == 0);
-	
-	USART1->DR = returnbuf[6];
-	while((USART1->SR & 0x40) == 0);
-	
-	USART1->DR = (uint8_t)(crc16 >> 8);
-	while((USART1->SR & 0x40) == 0);
-	
-	USART1->DR = (uint8_t)(crc16 & 0xff);
-	while((USART1->SR & 0x40) == 0);
-	
-	USART1->DR = 0x7e;	                        //结束码	
-	while((USART1->SR & 0x40) == 0);
-	
-	
-	
-	
-}
-//
-//请用 OffDisplay
 
-#if 1
+#endif
+//
+
+//
+
+
+#if 0
 void UpGrade(uint16_t len)
 {
 	uint16_t x;
@@ -1428,7 +1586,7 @@ void ReturnUpdataOK(void)
 	USART1->DR = 0xae;							//数据
 	while((USART1->SR & 0x40) == 0);
 }
-
+#if 0
 void ReturnUpdataError(void)
 {
 	uint16_t sum;
@@ -1467,6 +1625,7 @@ void ReturnUpdataError(void)
 	USART1->DR = 0xae;							//数据
 	while((USART1->SR & 0x40) == 0);
 }
+#endif
 //
 void ReturnVN(void)
 {
@@ -1517,7 +1676,250 @@ void ReturnVN(void)
 	while((USART1->SR & 0x40) == 0);
 }
 #endif
-//
+
+void do_monthdays(void)
+{
+	u8 year,month,day;
+	
+	day  = (gps_date.date_day_H - 0x30) << 4;
+	day |= gps_date.date_day_L - 0x30;
+	
+	day++;
+	
+	month  = (gps_date.date_month_H - 0x30) << 4;
+	month |= (gps_date.date_month_L - 0x30);
+	if(month < 13) {
+		if(day > monthdays[month]){
+			year  = (gps_date.date_year_H - 0x30) << 4;
+			year |= (gps_date.date_year_L - 0x30);
+			if(2 != month) {
+				day = 1;
+				if(++month>12){
+					month = 1;
+					year++;
+				}
+			}else {
+				if(year % 4) {
+					day = 1;
+					month++;
+				}
+			}
+			gps_date.date_month_H = (month >> 4) | 0x30;
+			gps_date.date_month_L = (month & 0x0f) | 0x30;
+			gps_date.date_year_H = (year >> 4) | 0x30;
+			gps_date.date_year_L = (year & 0x0f) | 0x30;
+		}
+	}
+	gps_date.date_day_H = (day >> 4) | 0x30;
+	gps_date.date_day_L = (day & 0x0f) | 0x30;
+
+}
+void do_fenduan(u8 a,u8 b)
+{
+	u8 i,j,m;
+	uint32_t ret;
+	
+		// (1)    UTC 时间，hhmmss（时分秒） 
+		if(b == 0){
+			if(0x2c == RxBuffer_Gps[a + 1]){
+				gps_date.time_hour_H = 0x2D;
+				gps_date.time_hour_L = 0x2D;
+				gps_date.time_munute_H = 0x2D;
+				gps_date.time_munute_L = 0x2D;
+				gps_date.time_second_H = 0x2D;
+				gps_date.time_second_L = 0x2D;
+				gps_date.add_day = 0;
+				
+			}else {
+				m = (RxBuffer_Gps[a + 1] - 0x30) * 10 + \
+					(RxBuffer_Gps[a + 2] - 0x30) + 8;
+				if(m > 23){
+					m -= 24;
+					gps_date.add_day = 1;
+				}else {
+					gps_date.add_day = 0;
+				}
+				gps_date.time_hour_H = (m / 10) + 0x30;
+				gps_date.time_hour_L = (m % 10) + 0x30;
+				gps_date.time_munute_H = RxBuffer_Gps[a + 3];
+				gps_date.time_munute_L = RxBuffer_Gps[a + 4];
+				gps_date.time_second_H = RxBuffer_Gps[a + 5];
+				gps_date.time_second_L = RxBuffer_Gps[a + 6];
+			}
+		}
+		
+		// (7)    地面速率（000.0~999.9 节） 一节也是1.852千米／小时）.2E
+		else if(6 == b){
+			if(0x2c == RxBuffer_Gps[a + 1]){
+			gps_date.speed_H = 0x2D;
+			gps_date.speed_M = 0x2D;
+			gps_date.speed_L = 0x2D;
+			}
+			ret = 0;
+			for(i = a+1; i < a+8; i ++){
+				if(0x2c == RxBuffer_Gps[i]) break;
+				if(0x2e == RxBuffer_Gps[i]){
+					j = i - a;
+					if(j > 1){
+						ret  = (uint32_t)(RxBuffer_Gps[i - 1] - 0x30) * 100;
+					}
+					if(j > 2){
+						ret += (uint32_t)(RxBuffer_Gps[i - 2] - 0x30) * 1000;
+					}
+					if(j > 3){
+						ret += (uint32_t)(RxBuffer_Gps[i - 3] - 0x30) * 10000;
+					}
+					
+					ret += (uint32_t)(RxBuffer_Gps[i + 1] - 0x30) * 10;
+					ret += (uint32_t)(RxBuffer_Gps[i + 2] - 0x30);
+
+					
+					ret *= 1852;
+					#if 0
+					USART1->DR = 0x2D; while((USART1->SR & 0x40) == 0);
+					USART1->DR = (u8)((ret / 100000) % 10 ) | 0x30; while((USART1->SR & 0x40) == 0);
+					USART1->DR = (u8)((ret / 10000) % 10 ) | 0x30; while((USART1->SR & 0x40) == 0);
+					USART1->DR = (u8)((ret / 1000) % 10 ) | 0x30; while((USART1->SR & 0x40) == 0);
+					USART1->DR = (u8)((ret / 100) % 10 ) | 0x30; while((USART1->SR & 0x40) == 0);
+					USART1->DR = (u8)((ret / 10) %10 ) | 0x30; while((USART1->SR & 0x40) == 0);
+					USART1->DR = (u8)(ret % 10) | 0x30; while((USART1->SR & 0x40) == 0);
+					#endif
+					break;
+				}
+			}
+			gps_date.speed_H = 0x20;
+			gps_date.speed_M = 0x20;
+			gps_date.speed_L = 0x30;
+			if(ret){
+				ret <<= 1; // 四舍五入
+				ret /= 100000;
+				
+				#if 0
+				USART1->DR = 0x2D; while((USART1->SR & 0x40) == 0);
+				USART1->DR = (u8)((ret / 100000) % 10 ) | 0x30; while((USART1->SR & 0x40) == 0);
+				USART1->DR = (u8)((ret / 10000) % 10 ) | 0x30; while((USART1->SR & 0x40) == 0);
+				USART1->DR = (u8)((ret / 1000) % 10 ) | 0x30; while((USART1->SR & 0x40) == 0);
+				USART1->DR = (u8)((ret / 100) % 10 ) | 0x30; while((USART1->SR & 0x40) == 0);
+				USART1->DR = (u8)((ret / 10) %10 ) | 0x30; while((USART1->SR & 0x40) == 0);
+				USART1->DR = (u8)(ret % 10) | 0x30; while((USART1->SR & 0x40) == 0);
+				#endif
+				
+				ret >>= 1;
+				
+				#if 0
+				USART1->DR = 0x2D; while((USART1->SR & 0x40) == 0);
+				USART1->DR = (u8)((ret / 100000) % 10 ) | 0x30; while((USART1->SR & 0x40) == 0);
+				USART1->DR = (u8)((ret / 10000) % 10 ) | 0x30; while((USART1->SR & 0x40) == 0);
+				USART1->DR = (u8)((ret / 1000) % 10 ) | 0x30; while((USART1->SR & 0x40) == 0);
+				USART1->DR = (u8)((ret / 100) % 10 ) | 0x30; while((USART1->SR & 0x40) == 0);
+				USART1->DR = (u8)((ret / 10) %10 ) | 0x30; while((USART1->SR & 0x40) == 0);
+				USART1->DR = (u8)(ret % 10) | 0x30; while((USART1->SR & 0x40) == 0);
+				#endif
+				
+				m = (u8)(ret / 100);
+				if(m)
+					gps_date.speed_H = (m / 100) + 0x30;
+				m = (ret / 10) % 10;
+				if(m)
+					gps_date.speed_M = ((ret / 10) % 10) + 0x30;
+				m = ret % 10;
+				if(m)
+					gps_date.speed_L = (ret % 10) + 0x30;
+				
+				#if 0
+				USART1->DR = 0x2D; while((USART1->SR & 0x40) == 0);
+				USART1->DR = gps_date.speed_H;
+				USART1->DR = gps_date.speed_M;
+				USART1->DR = gps_date.speed_L;
+				#endif
+				
+			}
+
+
+		}
+		
+		// (9)    UTC 日期，ddmmyy（日月年）  monthdays
+		if(b == 8) {
+			if(0x2c == RxBuffer_Gps[a + 1]) {
+				gps_date.date_year_H = 0x2D;
+				gps_date.date_year_L = 0x2D;
+				gps_date.date_month_H = 0x2D;
+				gps_date.date_month_L = 0x2D;
+				gps_date.date_day_H = 0x2D;
+				gps_date.date_day_L = 0x2D;
+				gps_date.add_day = 0;
+				gps_date.add_month = 0;
+				gps_date.add_year = 0;
+			}else{
+				gps_date.date_day_H   = RxBuffer_Gps[a + 1];
+				gps_date.date_day_L   = RxBuffer_Gps[a + 2];
+				gps_date.date_month_H = RxBuffer_Gps[a + 3];
+				gps_date.date_month_L = RxBuffer_Gps[a + 4];
+				gps_date.date_year_H  = RxBuffer_Gps[a + 5];
+				gps_date.date_year_L  = RxBuffer_Gps[a + 6];
+				if(gps_date.add_day)
+					do_monthdays();
+			}
+		}
+	
+}
+void do_GNRMC(void)
+{
+	u8 i,j,m,n;
+	u8 XOR, ret;
+	#if 0
+		USART1->DR = 0x2A; while((USART1->SR & 0x40) == 0);
+	USART1->DR = receive_data[text_index].time; while((USART1->SR & 0x40) == 0);
+	USART1->DR = time_upsec;while((USART1->SR & 0x40) == 0);
+	USART1->DR = 0x2A; while((USART1->SR & 0x40) == 0);
+#endif
+	// 异或和校验
+	XOR = 0;
+	for(i = 1; i < RxCounter_Gps - 4; i++)
+	{
+		XOR ^= RxBuffer_Gps[i];
+		//USART1->DR = RxBuffer_Gps[i]; while((USART1->SR & 0x40) == 0);
+	}
+	
+
+	m = RxBuffer_Gps[RxCounter_Gps - 3] - 0x30;
+	n = RxBuffer_Gps[RxCounter_Gps - 2] - 0x30;
+	
+	if(m > 0x09) m -= 7;
+	if(n > 0x09) n -= 7;
+	ret = (m<<4) | n;
+	
+	if(XOR != ret) {
+		return;
+	}
+	
+	// 分段 $GNRMC,014930.000,A,3022.90585,N,12002.34201,E,1.97,10.80,231218,,,A*45
+	j = 0;
+	for(i = 0; i < RxCounter_Gps; i++){
+		if(0x2c == RxBuffer_Gps[i]){
+			do_fenduan(i,j);
+			j++;
+		}
+	}
+	gps_date.flag = 1;
+	
+	//USART1->DR = 0x0d; while((USART1->SR & 0x40) == 0);
+	//USART1->DR = 0x0a; while((USART1->SR & 0x40) == 0);
+
+	if(!sys_move && text_flag)
+	{
+		ret = receive_data[text_index].tpye;
+		if(1 == ret)
+				do_time();
+		if(2 == ret)
+				do_speed();
+		if(3 == ret)
+				do_data();
+	}
+}
+
+
+
 /********************************************************************************
  *									END_FILE									*
  ********************************************************************************

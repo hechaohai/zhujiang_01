@@ -25,67 +25,158 @@
 // 	0x70,0x69,0x64,0x20,0x54,0x72,0x61,0x6E,0x73,0x69,0x74,
 // };
 
-const uint8_t const_word[ScreenLength] = {
+const uint8_t const_word[12] = {
 	//0xBB, 0xB6, 0xD3, 0xAD, 0xB9, 0xE2, 0xC1, 0xD9,//欢迎光临
-	0xD7, 0xA2, 0xD2, 0xE2, 0xB0, 0xB2, 0xC8, 0xAB,//注意安全
+	//0xD7, 0xA2, 0xD2, 0xE2, 0xB0, 0xB2, 0xC8, 0xAB,//注意安全
+	0x20,0x20,0x20,0x56,0x37,0x2E,0x30,0x2E,0x30,0x20,0x20,0x20,// V7.0.0
+	//0x36,0xBB, 0xB6, 0xD3, 0xAD, 0xB9, 0xE2, 0xC1, 0xD9,// V7.0.0
 };
 
+const uint8_t const_word1[ScreenLength] = {
+	//0xBB, 0xB6, 0xD3, 0xAD, 0xB9, 0xE2, 0xC1, 0xD9,//欢迎光临
+	0x20,0x20, 0xD7, 0xA2, 0xD2, 0xE2, 0xB0, 0xB2, 0xC8, 0xAB, 0x20,0x20,//注意安全
+	//0x20,0x20,0x20,0x56,0x37,0x2E,0x30,0x2E,0x30,0x20,0x20,0x20,// V7.0.0
+};
+
+// 版本信息
+const uint8_t ReceiveData_Head[66]={
+	0xA0, 0x07, 0x56, 0x06, 0x21, 0x4E, 0x05, 0x5C, 0x56, 0x00, 0xA0, 0x78, 0x39, 0x5B, 0x8D, 0xAD,
+0x3A, 0x61, 0xF5, 0x01, 0xD2, 0x27, 0x7C, 0x51, 0x70, 0xB1, 0xF9, 0x3D, 0x38, 0x33, 0x07, 0x00,
+0x00, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+};
+
+// 节目信息
+const uint8_t JiemuData_Head[66]={
+	0xA0, 0x07, 0x56, 0x06, 0x21, 0x4E, 0x05, 0x5C, 0x56, 0x00, 0xA0, 0x78, 0x39, 0x5B, 0x8D, 0xAD,
+0x3A, 0x61, 0xF5, 0x01, 0xD2, 0x27, 0x7C, 0x51, 0x70, 0xB1, 0xF9, 0x3D, 0x38, 0x33, 0x07, 0x00,
+0x00, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+};
+
+
+const uint8_t monthdays[13] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+
+const u8 const_speed[19] = { 
+	0x01, 0x02, 0x00, 0x01, 0x05, 0xCA, 0xB1, 0xCB, 0xD9, 0xA3, 
+	0xBA, 0x58, 0x58, 0x58, 0x20, 0x6B, 0x6D, 0x2F, 0x48,
+};
 
 //
 void Data_Init(void)
 {
-	u8  i;
+	u8  i,flag;
 	u16 x;
 	u8 *p,*pp;
 	
-	time_index = 0;
-	time_upindex = 0;
-	
-	CanRxIndex = 0;
-	CanDoIndexRx = 0;
-	
-	CanZiIndex = 0;
-	CanDoIndexZi = 0;
-	
-	CanUpIndex = 0;
-	CanDoIndexUp = 0;
-
-	timeout_index = 0;
-	timeout_index_p = 0;
-	timeout_flag = 1;
-	timeout_onece_text = 0;
-	timeout_doing_color = Red;
-	
-	for(x = 0; x < sizeof(RxBuffer); x++)
-	{
-		RxBuffer[x] = 0;
-	}
 	
 	// 扫描
 	LED_Index = 0;								// LED运行指示灯
 	LineIndex = 0;								// 扫描第几行
-	ClearDisplay();								
+						
 	DisplayIndex = 0;							// 处理缓存区选择
 
 	PictureIndex = 0;
 	Light = 7;
 	ID    = 0;
 	// 串口
-	ZhuanYi = 0;								// 1 下一个要转义 0 不用转义
-	Updata = 0;									// 有文本内容更新 0 头 1 文本 2 升级
+//	ZhuanYi = 0;								// 1 下一个要转义 0 不用转义
+	Updata_Text = 0;									// 有文本内容更新
+	Updata_GPS = 0;							// gps更新
 	RxIndex = 0;								// 接收USART计数
 	HeadIndex = 0;
 	NowIndex = 0;
 	ReceiveUSART1Data = 0;						// 接收一个字节
 	ReceiveUSART1True = FALSE;					// 判断是否有接收字节
 	if_display_none = 0;
-	load_diplay();
+	
 	
 	if_change_clor = 0;
 	
-	// 清除协议文本
-	for (i = 0 ; i < 15; i++) {
-		agreement_data.text[i].data[0] = 0xff;
+	timeout_index = 0;
+	timeout_index_p = 0;
+	timeout_flag = 1;
+	timeout_onece_text = 0;
+
+	NeedGPS = 0;
+	receive_update = 0;
+	text_index = 0;
+	text_flag = 0;
+	sys_move = 0;
+	diplay_data.text_GB_flag = 0;
+
+	
+		// 查看文本
+	
+	ClrNSS();
+	Read_Data(PromptSartAddr1);
+	for(i = 0; i < 66; i++){
+		if(JiemuData_Head[i] != Get_Byte()) break;
+	}
+	SetNSS();
+	
+
+	if(i > 65) {
+		ClrNSS();
+		Read_Data(PromptSartAddr2);
+		for(x = 0; x < 1566; x++)
+		{
+			*(&receive_data[0].head + x) = Get_Byte();
+		}
+		SetNSS();
+		
+	}else {
+		for(x = 0; x < 1566; x++)
+		{
+			*(&receive_data[0].head + x) = 0;
+		}
+	}
+
+	for(i = 0; i < 4; i++)
+	{
+		*(&gps_date.flag + i) = 0;
+	}
+	
+	//for(i = 0; i < 15; i++)
+	{
+		//*(&gps_date.time_hour_H + i) = 0x2D;
+		gps_date.time_hour_H = 0x2D;gps_date.time_hour_L = 0x2D;
+		gps_date.time_munute_H = 0x2D;gps_date.time_munute_L = 0x2D;
+		gps_date.time_second_H = 0x2D;gps_date.time_second_L = 0x2D;
+		gps_date.speed_H = 0x2D;gps_date.speed_M = 0x2D;gps_date.speed_L = 0x2D;
+		gps_date.date_year_H = 0x2D;gps_date.date_year_L = 0x2D;
+		gps_date.date_month_H = 0x2D;gps_date.date_month_L = 0x2D;
+		gps_date.date_day_H = 0x2D;gps_date.date_day_L = 0x2D;
+	}
+	
+	
+	
+	for(x = 0; x < sizeof(RxBuffer_Gps); x++)
+	{
+		RxBuffer_Gps[x] = 0;
+	}
+		for(x = 0; x < sizeof(RxBuffer_Text); x++)
+	{
+		RxBuffer_Text[x] = 0;
+	}
+	
+	RxCounter_Gps = 0;
+	
+	for(i = 0; i < sizeof(ReceiveData_Head); i++) {
+		
+		USART1->DR = ReceiveData_Head[i]; while((USART1->SR & 0x40) == 0);
+	}
+	
+	/*
+	01 02 00 01 05 CA B1 CB D9 A3 BA 58 58 58 
+ 20 6B 6D 2F 48
+	01 02 00 01 05 CA B1 CB D9 A3 BA 58 58 58 
+ 20 6B 6D 2F 48
+
+	*/
+	
+	for(x = 0; x < 1566; x++) {
+		USART1->DR = *(&receive_data[0].head + x); while((USART1->SR & 0x40) == 0);
 	}
 }
 
@@ -93,13 +184,12 @@ void Data_Init(void)
 void load_diplay(void)
 {
 	u8  i,len;
-	u8 date_temp[100];
 	u8  data_xor;
 	u16 x;
 	u8 *p,*pp;
 	u8 CMD;
 	u8 temp8,ret;
-	u8 temp[8] = {0,0,0,0,0,0,0,0};
+//	u8 temp[8] = {0,0,0,0,0,0,0,0};
 	
 display_done = 0;
 display_done_p = 0;
@@ -107,47 +197,14 @@ display_done_p = 0;
 	if(DisplayIndex) {p = &DisplayBuf0[0]; pp = &DisplayBuf1[0];}// 	if(DisplayIndex)  p = DisplayBuf0, pp = DisplayBuf1;
 	else             {p = &DisplayBuf1[0]; pp = &DisplayBuf0[0];}// 	else              p = DisplayBuf1, pp = DisplayBuf0;
 	
-	currnet_index = DEFAULT;
-
-	currnet_data[0].flag = Invalid;
-	currnet_data[1].flag = Invalid;
-	currnet_data[2].flag = Invalid;
-	currnet_data[3].flag = Invalid;
 	display_list[0] = 0;
 	display_list[1] = 0;
 	display_list[2] = 0;
 	display_list[3] = 0;
 	display_list_index = 0;
-
-	for (i = 0; i < 4; i++) {
-		currnet_data[i].id = i;
-		currnet_data[i].display_time = 1;
-		currnet_data[i].change_time = 0;
-		currnet_data[i].color = Yellow;
-		currnet_data[i].style = 9;//DISPLAY_MOVE;//
-		currnet_data[i].upstyle = 1;
-		currnet_data[i].if_screen_off = 0;
-		currnet_data[i].display_count = 0;
-		currnet_data[i].length = 0;//sizeof(const_word);
-	}
-
-	diplay_data.id = 0;
-	diplay_data.display_time = currnet_data[0].display_time;
-	diplay_data.change_time = currnet_data[0].change_time;
-	diplay_data.color = currnet_data[0].color;
-	diplay_data.style = currnet_data[0].style;//DISPLAY_MOVE;//
-	diplay_data.upstyle = 3;
-	diplay_data.if_screen_off = 0;
-	diplay_data.display_count = currnet_data[0].display_count;
-	diplay_data.length = 0;//sizeof(const_word);
-	for (i = 0; i < sizeof(const_word); i++) {
-		//diplay_data.text[i] = const_word[i];
-		//currnet_data[0].text[i] = const_word[i];
-	}
 	
 	Bemove        = 0;
 	HaveDisplayNum = 0;							// 上次移动后扫描多少次
-	MoveWord_p = &currnet_data[0].text[0];
 
 	updata_flag = 0;
 	update_agreement = 0;
@@ -157,108 +214,528 @@ display_done_p = 0;
 	
 	display_color = Yellow;
 	
-	time_index = 0;
 	time_upindex = 0;
-	time_sec = 0;
 	time_upsec = 0;
-	upturn_index = 0;
 	suoping = 0;
-	
-	return;
-	
-	//ClrNSS();
-	//Read_Data(PromptSartAddr1);
-	//for(i = 0; i < 8; i++){
-	//	temp[i]=Get_Byte();	
-	//}
-	//SetNSS();
-	//Can_Send_Msg(temp, 8);
-	
-	// 查看文本
-	CMD = 0;
-	if((0x7E == Read_Byte(PromptSartAddr1)))
-	{
-		len = Read_Byte(PromptSartAddr1 + 1);
-		
-		ClrNSS();
-		Read_Data(PromptSartAddr1 + 2);
-		data_xor = 0;
-		for( i = 0; i < len + 1; i++) {
-			date_temp[i] = Get_Byte();
-			data_xor ^= date_temp[i];
-		}
-		SetNSS();
-		// 校准通过
-		if(!data_xor){
-			diplay_data.length = len;
-			for (i = 0; i < len; i++) {
-				diplay_data.text[i] = date_temp[i];
-				currnet_data[0].text[i] = date_temp[i];
+}
+
+void do_load_up(void)
+{
+	u8 i,j,temp,ret;
+	u16 x;
+	u8 text[12];
+
+	XuehuaIndex = 0;
+	Xuehua_dibu = 0;
+	// 文本
+	if(receive_data[text_index].tpye == 0){ 
+		for(i = 0; i < 12; i++){
+			if(MovetextNum + i < diplay_data.length)
+			{
+				temp = receive_data[text_index].text[MovetextNum + i];
+				if(temp > 0)
+					text[i] = temp;
+				else
+					text[i] = 0x20;
 			}
-			CMD = 1;
+			else
+				text[i] = 0x20;
 		}
 		
-		
-	}
-
-	// 查看控制信息
-	CMD = 0;
-	if((0x7E == Read_Byte(PromptSartAddr2)))
-	{
-		
-		ClrNSS();
-		data_xor = 0;
-		for( i = 0; i < 5; i++)
-			data_xor ^= Get_Byte();
-		SetNSS();
-		// 校准通过
-		if(!data_xor){
-			CMD = 1;
-			diplay_data.display_time = Read_Byte(PromptSartAddr2 + 1);
-			diplay_data.color = Read_Byte(PromptSartAddr2 + 2);
-			diplay_data.style = Read_Byte(PromptSartAddr2 + 3);
-			diplay_data.change_time = Read_Byte(PromptSartAddr2 + 4);
-
-			currnet_data[0].display_time = diplay_data.display_time;
-			currnet_data[0].color = diplay_data.color;
-			currnet_data[0].style = diplay_data.style;
-			currnet_data[0].change_time = diplay_data.change_time;
+		j = 0;
+		if(MovetextNum + 12 < diplay_data.length){
+			for(i = 0;i < 12; i++){
+				if(receive_data[text_index].text[MovetextNum + i] < 0x7f)
+					j++;
+			}
 		}
 		
-	}
-	
-	
-	if (DISPLAY_STATIC == diplay_data.style) {
-		for (x = 0; x < DisplayBufMaxLength; x++)
-			upturn_buf[x] = 0;
-		
-		//uptext_index = 8;
-		upturn_index = 0;
-		
-		if(diplay_data.length > ScreenLength)
-			temp8 = ScreenLength;
+		if((j%2) && (receive_data[text_index].text[MovetextNum + 11] > 0x7f)){
+			text[11] = 0x20;
+			MovetextNum += 11;
+		}
 		else
-			temp8 = diplay_data.length;
+			MovetextNum += 12;
+
+	}
+	// 时间
+	else if(1 == receive_data[text_index].tpye)
+	{
+		text[0] = 0x20;
+		text[1] = 0x20;
+		text[2] = gps_date.time_hour_H;
+		text[3] = gps_date.time_hour_L;
+		text[4] = 0x3A;
+		text[5] = gps_date.time_munute_H;
+		text[6] = gps_date.time_munute_L;
+		text[7] = 0x3A;
+		text[8] = gps_date.time_second_H;
+		text[9] = gps_date.time_second_L;
+		text[10] = 0x20;
+		text[11] = 0x20;	
+		MovetextNum += 12;
+	}
+	// 时速
+	else if(2 == receive_data[text_index].tpye)
+	{
+		text[0] = 0xCA;
+		text[1] = 0xB1;
+		text[2] = 0xCB;
+		text[3] = 0xD9;
 		
-		CheckFile(&upturn_buf[0], &diplay_data.text[0], temp8);
+		text[4] = 0x3A;
+		text[5] = gps_date.speed_H;
+		text[6] = gps_date.speed_M;
+		text[7] = gps_date.speed_L;
 		
-		uptext_index = temp8 - ret;
+		text[8] = 'k';
+		text[9] = 'm';
+		text[10] = '/';
+		text[11] = 'h';
+		MovetextNum += 12;
+	}
+	// 日期
+	else if(3 == receive_data[text_index].tpye)
+	{
+		text[0] = gps_date.date_year_H;
+		text[1] = gps_date.date_year_L;
+		text[2] = 0xC4;
+		text[3] = 0xEA;
 		
-		for (x = 0; x < DisplayBufMaxLength; x++)
-			*(p + x) = 0;
+		text[4] = gps_date.date_month_H;
+		text[5] = gps_date.date_month_L;
+		text[6] = 0xD4;
+		text[7] = 0xC2;
 		
-		DisplayIndex = (DisplayIndex + 1) & 1;
-		for (x = 0; x < DisplayBufMaxLength; x++)
-			*(pp + x) = 0;
-	} else {
-		MoveIndex     = 0;							// 移动计数，满8位加载下一个文字
-		Move_LoadGB   = 0;							// 当前移动字符是GB2312(1)或ASCII(0)
-		MovetextNum   = 0;							// 移动第几个字节
-	}// 移动
+		text[8] = gps_date.date_day_H;
+		text[9] = gps_date.date_day_L;
+		text[10] = 0xC8;
+		text[11] = 0xD5;
+		MovetextNum += 12;
+	}
 	
+	// 清除换屏显示缓存
+	//for (x = 0; x < DisplayBufMaxLength; x++)
+	//	upturn_buf[x] = 0;
+
+	ret = CheckFile(&upturn_buf[0], text, 12);
+}
+
+void do_text(void)
+{
+	u8 i,j;
+	u8 temp;
+	u8 text[12];
+	u16 x;
+	
+	//tpye 00 文本 01 时间  02 时速 03 日期
+	//receive_data[text_index].tpye;
+	
+	for(i = 0; i < 12; i++){
+		if(diplay_data.text_index + i < diplay_data.length)
+		{
+			temp = receive_data[text_index].text[diplay_data.text_index + i];
+			if(temp > 0)
+				text[i] = temp;
+			else
+				text[i] = 0x20;
+		}
+		else
+			text[i] = 0x20;
+	}
+	
+	#if 1
+	j = 0;
+	if(diplay_data.text_index + 12 < diplay_data.length){
+		for(i = 0;i < 12; i++){
+			if(receive_data[text_index].text[diplay_data.text_index + i] < 0x7f)
+				j++;
+		}
+	}
+	
+	
+	if((j%2) && (receive_data[text_index].text[diplay_data.text_index + 11] > 0x7f)){
+		text[11] = 0x20;
+		diplay_data.text_index += 11;
+	}
+	else
+		diplay_data.text_index += 12;
+	#endif
+
+
+	
+	check_timeout2(text,12);
+
+}
+
+void do_time(void)
+{
+	u8 text[12];
+	
+	text[0] = 0x20;
+	text[1] = 0x20;
+	text[2] = gps_date.time_hour_H;
+	text[3] = gps_date.time_hour_L;
+	text[4] = 0x3A;
+	text[5] = gps_date.time_munute_H;
+	text[6] = gps_date.time_munute_L;
+	text[7] = 0x3A;
+	text[8] = gps_date.time_second_H;
+	text[9] = gps_date.time_second_L;
+	text[10] = 0x20;
+	text[11] = 0x20;	
+	//USART1->DR = 0xaa; while((USART1->SR & 0x40) == 0);
+	check_timeout2(text,12);
+}
+
+void do_data(void)
+{
+	u8 text[12];
+	
+	text[0] = gps_date.date_year_H;
+	text[1] = gps_date.date_year_L;
+	text[2] = 0xC4;
+	text[3] = 0xEA;
+	
+	text[4] = gps_date.date_month_H;
+	text[5] = gps_date.date_month_L;
+	text[6] = 0xD4;
+	text[7] = 0xC2;
+	
+	text[8] = gps_date.date_day_H;
+	text[9] = gps_date.date_day_L;
+	text[10] = 0xC8;
+	text[11] = 0xD5;
+	
+	check_timeout2(text,12);
+}
+
+void do_speed(void)
+{
+	u8 text[12];
+	
+	text[0] = 0xCA;
+	text[1] = 0xB1;
+	text[2] = 0xCB;
+	text[3] = 0xD9;
+	
+	text[4] = 0x3A;
+	text[5] = gps_date.speed_H;
+	text[6] = gps_date.speed_M;
+	text[7] = gps_date.speed_L;
+	
+	text[8] = 'k';
+	text[9] = 'm';
+	text[10] = '/';
+	text[11] = 'h';
+	
+
+	//for(i = 0; i < RxCounter_Gps; i++){
+	//USART1->DR = RxBuffer_Gps[i]; while((USART1->SR & 0x40) == 0);
+	//}
+	//USART1->DR = 0x0d; while((USART1->SR & 0x40) == 0);
+
+	check_timeout2(text,12);
+}
+//
+
+// 上翻
+#if 1
+void Move_Up(void)
+{
+	uint8_t  *p,*pp;
+	uint8_t  i,j;
+	uint16_t x, y;
+	u8 temp8, ret;
+
+	// 上翻一行
+	if (!Bemove)
+		return;
+	
+	Bemove = 0;
+	
+	if(DisplayIndex) {p = &DisplayBuf0[0]; pp = &DisplayBuf1[0];}
+	else             {p = &DisplayBuf1[0]; pp = &DisplayBuf0[0];}
+
+	for (i = 0; i < 15 - MoveIndex; i++) {
+		for(x = i * 8; x < DisplayBufMaxLength; x += 128) {
+			*(p + x)     = *(p + x +  8);
+			*(p + x + 1) = *(p + x +  9);
+			*(p + x + 2) = *(p + x + 10);
+			*(p + x + 3) = *(p + x + 11);
+			*(p + x + 4) = *(p + x + 12);
+			*(p + x + 5) = *(p + x + 13);
+			*(p + x + 6) = *(p + x + 14);
+			*(p + x + 7) = *(p + x + 15);
+		}
+	}
+	j = 0;
+	for (; i < 16; i++) {
+		y = j * 8;
+		for(x = i * 8; x < DisplayBufMaxLength; x += 128) {
+			*(p + x)     = upturn_buf[y];
+			*(p + x + 1) = upturn_buf[y + 1];
+			*(p + x + 2) = upturn_buf[y + 2];
+			*(p + x + 3) = upturn_buf[y + 3];
+			*(p + x + 4) = upturn_buf[y + 4];
+			*(p + x + 5) = upturn_buf[y + 5];
+			*(p + x + 6) = upturn_buf[y + 6];
+			*(p + x + 7) = upturn_buf[y + 7];
+			
+			y += 128;
+		}
+		j++;
+	}
+
+	//交换显示区
+	DisplayIndex = (DisplayIndex + 1) & 1;
+	
+	for (x = 0; x < DisplayBufMaxLength; x++)
+		 *(pp + x) = *(p + x);
+	
+	if(++MoveIndex > 15){
+		MoveIndex = 0;
+		time_upindex = 0;
+		time_upsec = 0;
+		sys_move = 0;
+		delay_ms(100);
+	}
+}
+#endif
+// 下翻
+#if 1
+void Move_Down(void)
+{
+	uint8_t  *p,*pp;
+	uint8_t  i,j;
+	uint16_t x, y;
+	u8 temp8, ret;
+
+	// 翻一行
+	if (!Bemove)
+		return;
+	
+	Bemove = 0;
+	
+	if(DisplayIndex) {p = &DisplayBuf0[0]; pp = &DisplayBuf1[0];}
+	else             {p = &DisplayBuf1[0]; pp = &DisplayBuf0[0];}
+
+	j = MoveIndex;
+	for (i = 0; i < MoveIndex+1; i++) {
+		y = (15 - j) * 8;
+		for(x = i * 8; x < DisplayBufMaxLength; x += 128) {
+			*(p + x)     = upturn_buf[y];
+			*(p + x + 1) = upturn_buf[y + 1];
+			*(p + x + 2) = upturn_buf[y + 2];
+			*(p + x + 3) = upturn_buf[y + 3];
+			*(p + x + 4) = upturn_buf[y + 4];
+			*(p + x + 5) = upturn_buf[y + 5];
+			*(p + x + 6) = upturn_buf[y + 6];
+			*(p + x + 7) = upturn_buf[y + 7];
+			
+			y += 128;
+		}
+		j--;
+	}
+	for (j = 15; j != i - 1; j--) {
+		for(x = j * 8; x < DisplayBufMaxLength; x += 128) {
+			*(p + x)     = *(p + x -  8);
+			*(p + x + 1) = *(p + x -  7);
+			*(p + x + 2) = *(p + x - 6);
+			*(p + x + 3) = *(p + x - 5);
+			*(p + x + 4) = *(p + x - 4);
+			*(p + x + 5) = *(p + x - 3);
+			*(p + x + 6) = *(p + x - 2);
+			*(p + x + 7) = *(p + x - 1);
+		}
+	}
+
+	//交换显示区
+	DisplayIndex = (DisplayIndex + 1) & 1;
+	
+	for (x = 0; x < DisplayBufMaxLength; x++)
+		 *(pp + x) = *(p + x);
+	
+	if(++MoveIndex > 15){
+		MoveIndex = 0;
+		time_upindex = 0;
+		time_upsec = 0;
+		sys_move = 0;
+		delay_ms(100);
+	}
+}
+#endif
+
+void Move_piaoxue(void)
+{
+	uint8_t  *p,*pp;
+	uint8_t  i,j,z;
+	uint16_t x, y;
+	u8 temp8, ret;
+
+	// 翻一行
+	if (!Bemove)
+		return;
+	
+	Bemove = 0;
+	
+	if(DisplayIndex) {p = &DisplayBuf0[0]; pp = &DisplayBuf1[0];}
+	else             {p = &DisplayBuf1[0]; pp = &DisplayBuf0[0];}
+	
+	// 底部还没移出
+	if(!Xuehua_dibu)
+	{
+		j = XuehuaIndex;
+		for (i = 0; i < XuehuaIndex+1; i++) {
+			y = (15 - (j/4)) * 8;
+			for(x = i * 8; x < DisplayBufMaxLength; x += 128) {
+				*(p + x)     = upturn_buf[y];
+				*(p + x + 1) = upturn_buf[y + 1];
+				*(p + x + 2) = upturn_buf[y + 2];
+				*(p + x + 3) = upturn_buf[y + 3];
+				*(p + x + 4) = upturn_buf[y + 4];
+				*(p + x + 5) = upturn_buf[y + 5];
+				*(p + x + 6) = upturn_buf[y + 6];
+				*(p + x + 7) = upturn_buf[y + 7];
+				y += 128;
+			}
+			j--;
+		}
+
+		for (j = 15; j > i - 1; j--) {
+			for(x = j * 8; x < DisplayBufMaxLength; x += 128) {
+				*(p + x)     = *(p + x -  8);
+				*(p + x + 1) = *(p + x -  7);
+				*(p + x + 2) = *(p + x - 6);
+				*(p + x + 3) = *(p + x - 5);
+				*(p + x + 4) = *(p + x - 4);
+				*(p + x + 5) = *(p + x - 3);
+				*(p + x + 6) = *(p + x - 2);
+				*(p + x + 7) = *(p + x - 1);
+			}
+		}
+		//底部移出
+		if(++XuehuaIndex > 15)
+		{
+			Xuehua_dibu = 1;
+			XuehuaIndex = 4;
+			MoveIndex = 0;
+			XuehuaIndex_p = 0;
+		}
+	}
+	else
+	{
+		y = (15 - XuehuaIndex) * 8;
+		
+		for(x = i * 8; x < DisplayBufMaxLength; x += 128) {
+			*(p + x)     = upturn_buf[y];
+			*(p + x + 1) = upturn_buf[y + 1];
+			*(p + x + 2) = upturn_buf[y + 2];
+			*(p + x + 3) = upturn_buf[y + 3];
+			*(p + x + 4) = upturn_buf[y + 4];
+			*(p + x + 5) = upturn_buf[y + 5];
+			*(p + x + 6) = upturn_buf[y + 6];
+			*(p + x + 7) = upturn_buf[y + 7];
+			y += 128;
+		}
+		
+		if(XuehuaIndex != 15){
+			for (j = 15 - XuehuaIndex_p; j != 0; j--) {
+				for(x = j * 8; x < DisplayBufMaxLength; x += 128) {
+					*(p + x)     = *(p + x -  8);
+					*(p + x + 1) = *(p + x -  7);
+					*(p + x + 2) = *(p + x - 6);
+					*(p + x + 3) = *(p + x - 5);
+					*(p + x + 4) = *(p + x - 4);
+					*(p + x + 5) = *(p + x - 3);
+					*(p + x + 6) = *(p + x - 2);
+					*(p + x + 7) = *(p + x - 1);
+				}
+			}
+		}
+
+		if(XuehuaIndex < 15){
+			XuehuaIndex++;
+			if((XuehuaIndex == 6) || (XuehuaIndex == 9) || (XuehuaIndex == 12) || (XuehuaIndex == 15)){
+				XuehuaIndex_p++;
+			}
+		}
+		MoveIndex++;
+		
+		
+	}
+
+	//交换显示区
+	DisplayIndex = (DisplayIndex + 1) & 1;
+	
+	for (x = 0; x < DisplayBufMaxLength; x++)
+		 *(pp + x) = *(p + x);
+	
+	if(MoveIndex >= 12){
+		MoveIndex = 0;
+		time_upindex = 0;
+		time_upsec = 0;
+		sys_move = 0;
+		delay_ms(100);
+	}
+
 }
 
 
+//
+void Move_LMR(void)
+{
+	uint8_t  *p,*pp;
+	uint8_t  i,j;
+	uint16_t x, y;
+	u8 temp8, ret;
+
+	// 上翻一行
+	if (!Bemove)
+		return;
+	
+	Bemove = 0;
+	
+	if(DisplayIndex) {p = &DisplayBuf0[0]; pp = &DisplayBuf1[0];}
+	else             {p = &DisplayBuf1[0]; pp = &DisplayBuf0[0];}
+
+
+	//for (i = 0; i < MoveIndex; i++) {
+		x = (MoveIndex % 8) + (MoveIndex/8) * 128;
+		for(j = 0;j < 16; j++) {
+			
+			//for(x = i * 8; x < DisplayBufMaxLength; x += 128) {
+				*(p + x) = upturn_buf[x];x+=8;
+			//}
+		}
+	//}
+	
+	x = ((95-MoveIndex) % 8) + ((95 - MoveIndex)/8) * 128; // 1535
+	for(j = 0;j < 16; j++) {
+		//for(x = i * 8; x < DisplayBufMaxLength; x += 128) {
+			*(p + x) = upturn_buf[x];x+=8;
+		//}
+	}
+	
+
+
+
+	//交换显示区
+	DisplayIndex = (DisplayIndex + 1) & 1;
+	
+	for (x = 0; x < DisplayBufMaxLength; x++)
+		 *(pp + x) = *(p + x);
+	
+	if(++MoveIndex > 48){
+		MoveIndex = 0;
+		time_upindex = 0;
+		time_upsec = 0;
+		sys_move = 0;
+		delay_ms(100);
+	}
+}
+
+//
 /********************************************************************************
  *								加载显示信息										*
  ********************************************************************************
@@ -267,15 +744,15 @@ u8 CheckFile(u8 *buf_p, u8 *text_p, u8 len)
 {
 	u8  i,h,l,*p;
 	u16 x;
-	u8 j,line, temp;
 	s16 z;
 
 	p = buf_p;
 	x = 0;
 	
-	if (len < ScreenLength) {
-		x = ((ScreenLength - len) >> 1)  << 7;
-	}
+	// 居中
+	//if (len < ScreenLength) {
+	//	x = ((ScreenLength - len) >> 1)  << 7;
+	//}
 
 	for ( i = 0; i < len; i++) {
 		h = *(text_p + i);
@@ -298,6 +775,7 @@ u8 CheckFile(u8 *buf_p, u8 *text_p, u8 len)
 	}
 	
 	// 修正居中
+	#if 0
 	if ((len < ScreenLength) && ((ScreenLength - len)%2)) {
 		p = buf_p;
 		for (z = DisplayBufMaxLength - 8; z >= 128; z -= 8){
@@ -322,98 +800,11 @@ u8 CheckFile(u8 *buf_p, u8 *text_p, u8 len)
 		}
 
 	}
+	#endif 
 	
 	return 0;
-
-	
-
-	
-	
-	
 }
 
-//
-/********************************************************************************
- *								加载图片信息										*
- ********************************************************************************
-*/
-#if 0
-void LoadPicture(uint8_t Index)
-{
-	uint8_t  *p,*pp;
-	uint32_t addr;
-	uint16_t Length;
-	uint16_t x;
-	uint8_t  XOR, i,j,m,n;
-	uint8_t  table[11];
-	#if 0
-	switch(Index)
-	{
-		case 0: m = 0x01; n = 0; break;
-		case 1: m = 0x02; n = 0; break;
-		case 2: m = 0x03; n = 0; break;
-		case 3: m = 0x01; n = 2; break;
-		case 4: m = 0x02; n = 1; break;
-		
-	}
-	if(DisplayIndex) {p = &DisplayBuf0[0][0]; pp = &DisplayBuf1[0][0];}
-	else             {p = &DisplayBuf1[0][0]; pp = &DisplayBuf0[0][0];}
-	
-	for(x = 0; x < MaxLine * 32; x++) *p++ = m;
-	for(x = 0; x < MaxLine * 32; x++) *p++ = m;
-	for(x = 0; x < MaxLine * 32; x++) *p++ = n;
-
-	DisplayIndex = (DisplayIndex + 1) & 1;
-	#endif
-	//
-	
-	addr = PictureStartAddr + Index * 0x4000;
-	if(DisplayIndex) {p = &DisplayBuf0[0][0]; pp = &DisplayBuf1[0][0];}
-	else             {p = &DisplayBuf1[0][0]; pp = &DisplayBuf0[0][0];}
-	ClrNSS();
-	Read_Data(addr);
-	for(i = 0; i < 11; i++)
-	{
-		table[i] = Get_Byte();
-	}
-	SetNSS();
-	//
-	if( (0x55  == table[0]) && (0xFF == table[1])  && (0x55 == table[2]) &&
-		(0x53  == table[3]) && (0x49 == table[4])  && (0x4E == table[5]) &&
-		((ID   == table[6]) || (0xFF == table[6])) && (0xA1 == table[7]) &&
-		(Index == table[10] - 1) )
-// 	if( (0x55 == Read_Byte(addr))     && (0xFF == Read_Byte(addr + 1))  && (0x55 == Read_Byte(addr + 2)) &&
-// 		(0x53 == Read_Byte(addr + 3)) && (0x49 == Read_Byte(addr + 4))  && (0x4E == Read_Byte(addr + 5)) &&
-// 		((ID  == Read_Byte(addr + 6)) || (0xFF == Read_Byte(addr + 6))) && (0xA1 == Read_Byte(addr + 7)) &&
-// 		(Index == Read_Byte(addr + 10) - 1) )
-	{
-		Length = ((uint16_t)table[8] << 8) + table[9] - 1;
-		
-		XOR = 0;
-		ClrNSS();
-		Read_Data(addr);
-		for(x = 0; x < 12 + Length; x++)
-		{
-			//XOR ^= Read_Byte(addr + x);
-			XOR ^= Get_Byte();
-		}
-		SetNSS();
-		if(XOR) return;
-		
-		//ClearDisplay();
-		ClrNSS();
-		Read_Data(addr + 11);
-		for(x = 0; x < Length; x++)
-		{
-			//*(p + x) = Read_Byte(addr + x + 11);
-			*(p + x) = Get_Byte();
-		}
-		SetNSS();
-		DisplayIndex = (DisplayIndex + 1) & 1;
-		//for(x = 0; x < sizeof(DisplayBuf0); x++) *(pp + x) = *(p + x);
-	}
-}
-#endif
 /************************************************************************************
  *                                      加载文字										*
  *********************************************************8**************************/
@@ -459,6 +850,7 @@ void LoadChar(uint8_t *p, uint16_t dat)
 				//*(p + i + 16) = ~Get_Byte();
 				a = Get_Byte();
 				b = Get_Byte();
+				#if 1
 				*(p + i*8)     = (a & (0x80)) >> 7;
 				*(p + i*8 + 1) = (a & (0x40)) >> 6;
 				*(p + i*8 + 2) = (a & (0x20)) >> 5;
@@ -468,7 +860,6 @@ void LoadChar(uint8_t *p, uint16_t dat)
 				*(p + i*8 + 6) = (a & (0x02)) >> 1;
 				*(p + i*8 + 7) = (a & (0x01));
 
-
 				*(p + i*8 + 128) = (b & (0x80)) >> 7;
 				*(p + i*8 + 129) = (b & (0x40)) >> 6;
 				*(p + i*8 + 130) = (b & (0x20)) >> 5;
@@ -477,6 +868,28 @@ void LoadChar(uint8_t *p, uint16_t dat)
 				*(p + i*8 + 133) = (b & (0x04)) >> 2;
 				*(p + i*8 + 134) = (b & (0x02)) >> 1;
 				*(p + i*8 + 135) = (b & (0x01));
+				
+				#else
+				*(p + i*8)     = (a & (0x01));
+				*(p + i*8 + 1) = (a & (0x02)) >> 1;
+				*(p + i*8 + 2) = (a & (0x04)) >> 2;
+				*(p + i*8 + 3) = (a & (0x08)) >> 3;
+				*(p + i*8 + 4) = (a & (0x10)) >> 4;
+				*(p + i*8 + 5) = (a & (0x20)) >> 5;
+				*(p + i*8 + 6) = (a & (0x40)) >> 6;
+				*(p + i*8 + 7) = (a & (0x80)) >> 7;
+
+				
+
+				*(p + i*8 + 128) = (b & (0x01));
+				*(p + i*8 + 129) = (b & (0x02)) >> 1;
+				*(p + i*8 + 130) = (b & (0x04)) >> 2;
+				*(p + i*8 + 131) = (b & (0x08)) >> 3;
+				*(p + i*8 + 132) = (b & (0x10)) >> 4;
+				*(p + i*8 + 133) = (b & (0x20)) >> 5;
+				*(p + i*8 + 134) = (b & (0x40)) >> 6;
+				*(p + i*8 + 135) = (b & (0x80)) >> 7;
+				#endif
 			}
     }
     else if(dat >= 0xA100)
@@ -489,7 +902,7 @@ void LoadChar(uint8_t *p, uint16_t dat)
 				//b = ~Get_Byte();
 				a = Get_Byte();
     		b = Get_Byte();
-
+				#if 1
 				*(p + i*8)     = (a & (0x80)) >> 7;
 				*(p + i*8 + 1) = (a & (0x40)) >> 6;
 				*(p + i*8 + 2) = (a & (0x20)) >> 5;
@@ -498,7 +911,7 @@ void LoadChar(uint8_t *p, uint16_t dat)
 				*(p + i*8 + 5) = (a & (0x04)) >> 2;
 				*(p + i*8 + 6) = (a & (0x02)) >> 1;
 				*(p + i*8 + 7) = (a & (0x01));
-
+				
 				*(p + i*8 + 128) = (b & (0x80)) >> 7;
 				*(p + i*8 + 129) = (b & (0x40)) >> 6;
 				*(p + i*8 + 130) = (b & (0x20)) >> 5;
@@ -507,6 +920,27 @@ void LoadChar(uint8_t *p, uint16_t dat)
 				*(p + i*8 + 133) = (b & (0x04)) >> 2;
 				*(p + i*8 + 134) = (b & (0x02)) >> 1;
 				*(p + i*8 + 135) = (b & (0x01));
+				
+				#else
+				*(p + i*8)     = (a & (0x01));
+				*(p + i*8 + 1) = (a & (0x02)) >> 1;
+				*(p + i*8 + 2) = (a & (0x04)) >> 2;
+				*(p + i*8 + 3) = (a & (0x08)) >> 3;
+				*(p + i*8 + 4) = (a & (0x10)) >> 4;
+				*(p + i*8 + 5) = (a & (0x20)) >> 5;
+				*(p + i*8 + 6) = (a & (0x40)) >> 6;
+				*(p + i*8 + 7) = (a & (0x80)) >> 7;
+
+
+				*(p + i*8 + 128) = (b & (0x01));
+				*(p + i*8 + 129) = (b & (0x02)) >> 1;
+				*(p + i*8 + 130) = (b & (0x04)) >> 2;
+				*(p + i*8 + 131) = (b & (0x08)) >> 3;
+				*(p + i*8 + 132) = (b & (0x10)) >> 4;
+				*(p + i*8 + 133) = (b & (0x20)) >> 5;
+				*(p + i*8 + 134) = (b & (0x40)) >> 6;
+				*(p + i*8 + 135) = (b & (0x80)) >> 7;
+				#endif
         }
     }
     else
@@ -517,8 +951,8 @@ void LoadChar(uint8_t *p, uint16_t dat)
 			{
 				//a = ~Get_Byte();
 				a = Get_Byte();
-				
-				*(p + i*8)     = (a & (0x80)) >> 7;
+				#if 1
+				 *(p + i*8)     = (a & (0x80)) >> 7;
 				*(p + i*8 + 1) = (a & (0x40)) >> 6;
 				*(p + i*8 + 2) = (a & (0x20)) >> 5;
 				*(p + i*8 + 3) = (a & (0x10)) >> 4;
@@ -526,33 +960,22 @@ void LoadChar(uint8_t *p, uint16_t dat)
 				*(p + i*8 + 5) = (a & (0x04)) >> 2;
 				*(p + i*8 + 6) = (a & (0x02)) >> 1;
 				*(p + i*8 + 7) = (a & (0x01));
+
+				#else
+				*(p + i*8)     = (a & (0x01));
+				*(p + i*8 + 1) = (a & (0x02)) >> 1;
+				*(p + i*8 + 2) = (a & (0x04)) >> 2;
+				*(p + i*8 + 3) = (a & (0x08)) >> 3;
+				*(p + i*8 + 4) = (a & (0x10)) >> 4;
+				*(p + i*8 + 5) = (a & (0x20)) >> 5;
+				*(p + i*8 + 6) = (a & (0x40)) >> 6;
+				*(p + i*8 + 7) = (a & (0x80)) >> 7;
+				#endif
     	}
     }
     SetNSS();
 }
-//
-/********************  清屏  *****************************/
-void ClearScreen(void)
-{
-	uint8_t i;
 
-    // 清屏 //
-	GPIO_ResetBits(GPIOA,GPIO_Pin_11);
-	
-    GPIOB->BSRR = ((uint16_t)0xFF << 8);
-	
-    for(i = 0; i < ScreenLength; i++)
-    {
-        GPIO_ResetBits(GPIOA,GPIO_Pin_12);
-        __nop();__nop();__nop();__nop();__nop();__nop();__nop();
-		GPIO_SetBits(GPIOA,GPIO_Pin_12);
-        __nop();__nop();__nop();__nop();__nop();__nop();__nop();
-    }
-    GPIO_SetBits(GPIOA,GPIO_Pin_11);
-	//
-	__nop();__nop();__nop();__nop();__nop();__nop();__nop();
-	__nop();__nop();__nop();__nop();__nop();__nop();__nop();
-}
 //
 void delay_ms(uint8_t num)
 {
@@ -593,62 +1016,8 @@ void ClearDisplay(void)
 	}
 }
 //
-void ReadID(void)
-{
-	uint8_t tmp_table[12],i,crc;
-	
-	//
-	ClrNSS();
-	Read_Data(IDAddr);
-	for(i = 0; i < 12; i++)
-	{
-		tmp_table[i] = Get_Byte();
-	}
-	SetNSS();  
-	
-	if( 0x55 == tmp_table[0] && 0xff == tmp_table[1] && 0x55 == tmp_table[2] && 0x53 == tmp_table[3] &&
-		0x49 == tmp_table[4] && 0x4E == tmp_table[5] && 0xa4 == tmp_table[7] ) 
-	{
-		crc = 0;
-		for(i = 0; i < 12; i++ )
-		{
-			crc ^= tmp_table[i];
-		}
-		if(!crc)
-		{
-			ID = tmp_table[10];
-		}
-	}
-}
-//
-void ReadLight(void)
-{
-	uint8_t tmp_table[12],i,crc;
-	
-	//
-	ClrNSS();
-	Read_Data(LightAddr);
-	for(i = 0; i < 12; i++)
-	{
-		tmp_table[i] = Get_Byte();
-	}
-	SetNSS();  
-	
-	if( 0x55 == tmp_table[0] && 0xff == tmp_table[1] && 0x55 == tmp_table[2] && 0x53 == tmp_table[3] &&
-		0x49 == tmp_table[4] && 0x4E == tmp_table[5] && 0xa3 == tmp_table[7] ) 
-	{
-		crc = 0;
-		for(i = 0; i < 12; i++ )
-		{
-			crc ^= tmp_table[i];
-		}
-		if(!crc)
-		{
-			Light = tmp_table[10];
-		}
-	}
-}
-//
+
+
 /********************************************************************************
  *								初始化											*
  ********************************************************************************
@@ -700,7 +1069,7 @@ void init_system(void)
 	// 外设时钟 USART1 时钟开启，IO端口ABC时钟开启
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1 | RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB | RCC_APB2Periph_GPIOC, ENABLE);		
 	
-	USART_InitStructure.USART_BaudRate 				= 9600;
+	USART_InitStructure.USART_BaudRate 				= 115200;
 	USART_InitStructure.USART_WordLength 			= USART_WordLength_8b;				//0
 	USART_InitStructure.USART_StopBits 				= USART_StopBits_1;					//0
 	USART_InitStructure.USART_Parity 				= USART_Parity_No;					//0
@@ -715,6 +1084,8 @@ void init_system(void)
 	USART_Cmd(USART1, ENABLE);
 	while(!(USART1->SR & 0x40));
 	
+	
+	
 // 	USART1->BRR  = 0x1D4C;											 // 波特率 9600bps
 // 	USART1->CR1  = (1 << 13) | (1 << 3) | (1 << 2);		             // 使能USART1,使能接收和发送
 // 	USART1->CR3 |= (1 << 6);								         // 使能DMA接收
@@ -725,19 +1096,58 @@ void init_system(void)
     GPIO_InitStructure.GPIO_Speed 	= GPIO_Speed_50MHz;
     GPIO_Init(GPIOA, &GPIO_InitStructure);
 
-    // 配置 USART1 Tx (PA.10) //上拉输入
+    // 配置 USART1 Rx (PA.10) //上拉输入
     GPIO_InitStructure.GPIO_Pin 	= GPIO_Pin_10;
     GPIO_InitStructure.GPIO_Mode 	= GPIO_Mode_IPU;
     GPIO_Init(GPIOA, &GPIO_InitStructure);
-	
+	#if 1
 	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
 	DMA1_Channel5->CCR   &= 0xFFFFFFFE;							// DMA 关闭
-	DMA1_Channel5->CNDTR  = UARTMaxLength;       				// DMA 长度       				
+	DMA1_Channel5->CNDTR  = UARTMaxLength_Text;       				// DMA 长度       				
 	DMA1_Channel5->CPAR   = (uint32_t)(&USART1->DR);			// 通道x外设地址
-	DMA1_Channel5->CMAR   = (uint32_t)(&RxBuffer[0]);			// 通道x存储器地址
+	DMA1_Channel5->CMAR   = (uint32_t)(&RxBuffer_Text[0]);			// 通道x存储器地址
 	DMA1_Channel5->CCR    = (1 << 7) | (1 << 5);				// 执行存储器地址增量操作、执行循环操作
 	DMA1_Channel5->CCR   |= 1;									// DMA 开启
+	#endif
+	
+	//---------------------------------------------------
+	//---------------------------------------------------
 
+// 外设时钟 USART3 时钟开启
+  //RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1 | RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB | RCC_APB2Periph_GPIOC, ENABLE);		
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3,ENABLE);
+	USART_InitStructure.USART_BaudRate 				= 9600;
+	USART_InitStructure.USART_WordLength 			= USART_WordLength_8b;				//0
+	USART_InitStructure.USART_StopBits 				= USART_StopBits_1;					//0
+	USART_InitStructure.USART_Parity 				= USART_Parity_No;					//0
+	USART_InitStructure.USART_HardwareFlowControl 	= USART_HardwareFlowControl_None | USART_DMAReq_Rx;	// 0 | 0x0040
+	USART_InitStructure.USART_Mode 					= USART_Mode_Rx | USART_Mode_Tx;	//4 | 8
+	//AFIO_MAPR_USART3_REMAP
+	USART_Init(USART3, &USART_InitStructure);
+	USART_ITConfig(USART3, USART_IT_RXNE, ENABLE);			// 使能 接收中断
+	
+	// 使能 USART3
+	USART_Cmd(USART3, ENABLE);
+	while(!(USART3->SR & 0x40));
+
+	// 配置 USART3 Tx (PB.10) //复用推挽输出
+    GPIO_InitStructure.GPIO_Pin 	= GPIO_Pin_10;
+    GPIO_InitStructure.GPIO_Mode 	= GPIO_Mode_AF_PP;
+    GPIO_InitStructure.GPIO_Speed 	= GPIO_Speed_50MHz;
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+    // 配置 USART3 Rx (PB.11) //上拉输入
+    GPIO_InitStructure.GPIO_Pin 	= GPIO_Pin_11;
+    GPIO_InitStructure.GPIO_Mode 	= GPIO_Mode_IPU;
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
+		
+		//RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
+		
+
+	//---------------------------------------------------
+	//---------------------------------------------------
+	
+	
 	// 配置 显示行ABCD (PC.9、8、7、6) 推挽输出
     GPIO_InitStructure.GPIO_Pin 	= GPIO_Pin_9;
     GPIO_InitStructure.GPIO_Mode 	= GPIO_Mode_Out_PP;
@@ -750,15 +1160,15 @@ void init_system(void)
     GPIO_Init(GPIOC, &GPIO_InitStructure);
 	
 	// 配置 数据红色R12 (PB 10 13) 推挽输出
-    GPIO_InitStructure.GPIO_Pin 	= GPIO_Pin_10;
-    GPIO_Init(GPIOB, &GPIO_InitStructure);
+    //GPIO_InitStructure.GPIO_Pin 	= GPIO_Pin_10;
+    //GPIO_Init(GPIOB, &GPIO_InitStructure);
     GPIO_InitStructure.GPIO_Pin 	= GPIO_Pin_13;
     GPIO_Init(GPIOB, &GPIO_InitStructure);
    
 
 	// 配置 数据绿色G12 (PB 11 14) 推挽输出
-    GPIO_InitStructure.GPIO_Pin 	= GPIO_Pin_11;
-    GPIO_Init(GPIOB, &GPIO_InitStructure);
+    //GPIO_InitStructure.GPIO_Pin 	= GPIO_Pin_11;
+    //GPIO_Init(GPIOB, &GPIO_InitStructure);
     GPIO_InitStructure.GPIO_Pin 	= GPIO_Pin_14;
     GPIO_Init(GPIOB, &GPIO_InitStructure);
 		
@@ -820,9 +1230,15 @@ void init_system(void)
 	
 	NVIC->ICER[7  / 32]	|= 1u << (7  % 32);                          // 禁止EXTI1中断
 	NVIC->ICER[8  / 32]	|= 1u << (8  % 32);                          // 禁止EXTI2中断
+	// USART3
+	NVIC_InitStructure.NVIC_IRQChannel = USART3_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 3;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
 	// USART1
 	NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn;
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 3;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
@@ -856,17 +1272,13 @@ void init_system(void)
 	//IWDG_ReloadCounter();   //③按照 IWDG 重装载寄存器的值重装载 IWDG 计数器
 	//IWDG_Enable();         //④使能 IWDG
 	
-	OffDisplay();	//关显示
+	
 	Init_SST25VF();						//初始化Flash
-	
-	
-	
+
 	RS485_R();							//485接收
-	ClearScreen();						//清屏一行
-	//Data_Init();
+	//ClearScreen();						//清屏一行
 	
-	ReadID();
-	ReadLight();
+	Data_Init();
 	
 	TIM_Cmd(TIM3, DISABLE);
 //	TIM_Cmd(TIM4, DISABLE);
@@ -876,4 +1288,148 @@ void init_system(void)
 	__enable_irq();						//使能所有中断 
 }
 //
+void UBX_CFG_MSG(void)
+{
+	uint8_t i;
+	//uint8_t UBX_CFG_MSG_Buf[6] = {0x24,0x2B,0x32,0x39,0x40,0x47};
+	uint8_t UBX_CFG_MSG_Buf[5] = {0x24,0x2B,0x32,};
+
+// 间距200ms
+#if 0
+//B5 62 06 07 14 00 40 0D 03 00 A0 86 01 00 01 01 00 00 34 03 00 00 00 00 00 00 D1 CA
+const u8 dat_time[28]={ 0xB5, 0x62, 0x06, 0x07, 0x14, 0x00, 0x40, 0x0D, 0x03, 0x00, \
+	0xA0, 0x86, 0x01, 0x00, 0x01, 0x01, 0x00, 0x00, 0x34, \
+	0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xD1, 0xCA};
+
+
+for(i = 0; i < sizeof(dat_time); i++)
+	{
+		USART3->DR = dat_time[i]; while((USART3->SR & 0x40) == 0);
+	}
+	#endif
+	
+		
+
+//
+	//$GPRMC
+	//b5 62 06 01 08 00 f0 04 00 01 00 00 00 00 04 3c
+	for(i = 0; i < 4; i++)
+	{
+		USART3->DR = 0xB5; while((USART3->SR & 0x40) == 0);
+		USART3->DR = 0x62; while((USART3->SR & 0x40) == 0);
+		USART3->DR = 0x06; while((USART3->SR & 0x40) == 0);
+		USART3->DR = 0x01; while((USART3->SR & 0x40) == 0);
+		USART3->DR = 0x08; while((USART3->SR & 0x40) == 0);
+		USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+		USART3->DR = 0xF0; while((USART3->SR & 0x40) == 0);
+		USART3->DR = i;    while((USART3->SR & 0x40) == 0);
+		USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+		USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+		USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+		USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+		USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+		USART3->DR = 0x01; while((USART3->SR & 0x40) == 0);
+		//
+		USART3->DR = i;    while((USART3->SR & 0x40) == 0);
+		USART3->DR = UBX_CFG_MSG_Buf[i]; while((USART3->SR & 0x40) == 0);
+	}
+	//GPTXT
+//b5 62 06 01 08 00 f0 0f 00 00 00 00 00 01 0f 8d
+//b5 62 06 01 08 00 f0 10 00 00 00 00 00 01 10 94
+	USART3->DR = 0xB5; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x62; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x06; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x01; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x08; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0xF0; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x10; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x01; while((USART3->SR & 0x40) == 0);
+	//
+	USART3->DR = 0x10; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x94; while((USART3->SR & 0x40) == 0);
+	
+	// 取消ZDA
+	#if 1
+//b5 62 06 01 08 00 f0 08 00 00 00 00 00 01 08 5c
+	USART3->DR = 0xB5; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x62; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x06; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x01; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x08; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0xF0; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x08;    while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x01; while((USART3->SR & 0x40) == 0);
+	//
+	USART3->DR = 0x08;    while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x5c; while((USART3->SR & 0x40) == 0);
+	#endif
+		//$GPRMC
+	//b5 62 06 01 08 00 f0 04 00 01 00 00 00 00 04 3c
+	USART3->DR = 0xB5; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x62; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x06; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x01; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x08; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0xF0; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x04; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x01; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	//
+	USART3->DR = 0x04; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x44; while((USART3->SR & 0x40) == 0);
+	
+	
+
+	// ZDA
+	#if 0
+	USART3->DR = 0xB5; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x62; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x06; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x01; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x08; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0xF0; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x08; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x01; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);
+	//
+	USART3->DR = 0x08; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x60; while((USART3->SR & 0x40) == 0);
+	#endif
+	//
+	// 保存
+	USART3->DR = 0xB5; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x62; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x06; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x09; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x0D; while((USART3->SR & 0x40) == 0);
+	for(i = 0; i < 5; i++) {USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);}
+	USART3->DR = 0xFF; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0xFF; while((USART3->SR & 0x40) == 0);
+	for(i = 0; i < 6; i++) {USART3->DR = 0x00; while((USART3->SR & 0x40) == 0);}
+	USART3->DR = 0x03; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0x1D; while((USART3->SR & 0x40) == 0);
+	USART3->DR = 0xAB; while((USART3->SR & 0x40) == 0);
+}
 //

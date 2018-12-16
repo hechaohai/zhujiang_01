@@ -187,15 +187,15 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
 		// ×Ö¿â
 		else if (RxMessage.ExtId == 0x12345678){
 			for (i = 0; i < 8; i++) {
-				CanZiBuffer[CanZiIndex] = RxMessage.Data[i];
-				CanZiIndex = (CanZiIndex + 1) & (CanMaxLength - 1);
+				//CanZiBuffer[CanZiIndex] = RxMessage.Data[i];
+				//CanZiIndex = (CanZiIndex + 1) & (CanMaxLength - 1);
 			}
 		}
 		// Éý¼¶
 		else if (RxMessage.ExtId == 0x87654321) {
 			for (i = 0; i < 8; i++) {
-				CanUpBuffer[CanUpIndex] = RxMessage.Data[i];
-				CanUpIndex = (CanUpIndex + 1) & (CanMaxLength - 1);
+				//CanUpBuffer[CanUpIndex] = RxMessage.Data[i];
+				//CanUpIndex = (CanUpIndex + 1) & (CanMaxLength - 1);
 			}
 		}
 	}

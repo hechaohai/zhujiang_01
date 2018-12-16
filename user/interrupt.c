@@ -2,11 +2,46 @@
 //#include "ds1302.h"
 #include "crc.h"
 #include "sst25vf.h"
-#include "can.h"
+//#include "can.h"
 
 extern void MoveWordLine1(void);
 extern void MoveWordLine2(void);
 extern void MoveWordLine3(void);
+
+
+/********************************************************************************
+ *							串口3中断服务程序									*
+ ********************************************************************************
+*/
+void USART3_IRQHandler(void)
+{
+	uint8_t  ReadUsartData;
+	if(USART3->SR & (1 << 5))
+	{
+		ReadUsartData = USART3->DR;
+		
+
+		if((0 == RxCounter_Gps && '$' == ReadUsartData) || \
+			(1 == RxCounter_Gps && 'G' == ReadUsartData) || \
+			(2 == RxCounter_Gps && 'N' == ReadUsartData) || \
+			(3 == RxCounter_Gps && 'R' == ReadUsartData) || \
+			(4 == RxCounter_Gps && 'M' == ReadUsartData) || \
+			(5 == RxCounter_Gps && 'C' == ReadUsartData)) {
+			RxBuffer_Gps[RxCounter_Gps++] = ReadUsartData;
+		} 
+		else if(RxCounter_Gps > 5 && RxCounter_Gps < 90) {
+			RxBuffer_Gps[RxCounter_Gps++] = ReadUsartData;
+			if(0x0d == ReadUsartData){
+				Updata_GPS = 1;
+				USART_ITConfig(USART3, USART_IT_RXNE, DISABLE);
+			}
+		}
+		else {
+			RxCounter_Gps = 0;
+		}
+
+	}
+}
 
 /********************************************************************************
  *							定时器4中断服务程序									*
@@ -48,7 +83,7 @@ void TIM3_IRQHandler(void)
 		TIM3->SR = (uint16_t)~TIM_IT_Update;				// 1
 		//TIM_Cmd(TIM3, DISABLE);
 		TIM3->CR1 &= (uint16_t)(~((uint16_t)TIM_CR1_CEN));	// 1
-		OffDisplay();
+		//OffDisplay;
 
 	}
 }
@@ -59,381 +94,168 @@ void TIM3_IRQHandler(void)
 */
 void TIM2_IRQHandler(void)
 {
-	uint16_t i,z;
-	uint16_t  j;
+	uint16_t i, z;
+	uint8_t  j,date;
 	uint8_t  *p;
-	uint8_t date_temp;
-	uint16_t x,y,tt;
+//	uint8_t date_temp;
+	uint16_t x,y,m1,m2,n1,n2,tt;
 	u8 temp[8];
 	
 	if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET)  //检查TIM2更新中断发生与否
 	{
 		TIM_ClearITPendingBit(TIM2, TIM_IT_Update);		//清除TIMx更新中断标志
-		
-		//if(!diplay_data.display_time)
-		//{
-		//	OffDisplay();
-		//}
-		
-		
-		if(++timeout_index >= 20000)
-		{
-			timeout_index = 0;
-			if (++timeout_index_p >= 3) {
-				timeout_index_p = 0;
 
-				//更新文本
-				//updata_flag = 2;
-				
-				// 之前没有警告
-				if(timeout_doing_color != Red)
-				{
-					timeout_flag = 1;
-					timeout_doing_color = Red;
-				}
-			}
-		}
 		//
 		if(DisplayIndex) p = DisplayBuf1;
 		else             p = DisplayBuf0;
 		GPIOC->BRR = GPIO_Pin_5;//GPIO_ResetBits(GPIOC,GPIO_Pin_5); //595锁存
 		//
 		
-		//x = (u16)LineIndex * MaxLine;
-		//for(y = 0; y < MaxLine; y += 16)
-		//for(x = (u16)LineIndex * 8; x < DisplayBufMaxLength; x += 128)
-		#if 0
-		for(x = LineIndex ; x < 32; x += 16)
-		//x = LineIndex;
-		{
-			tt = x * 8;
-			for(z = 0; z < 8; z++) {
-				GPIO_ResetBits(GPIOC,GPIO_Pin_4);
-				//date_temp  = *(p +x);
-				//date_temp |= *(p +x + 512) << 4;
-
-				switch (*(p + tt  + z) ) {
-					//ReturnByte(*(p + x  + z));
-					case 1: 	
-
-							GPIO_SetBits(GPIOB,GPIO_Pin_10);
-							GPIO_ResetBits(GPIOB,GPIO_Pin_11);
-							
-							break;
-					case 2: 	GPIO_SetBits(GPIOB,GPIO_Pin_10);
-							GPIO_ResetBits(GPIOB,GPIO_Pin_11);
-							break;
-					case 3: 	GPIO_SetBits(GPIOB,GPIO_Pin_10);
-							GPIO_ResetBits(GPIOB,GPIO_Pin_11);
-							break;
-					default: 	GPIO_ResetBits(GPIOB,GPIO_Pin_10); 
-							GPIO_ResetBits(GPIOB,GPIO_Pin_11); 
-							break;
-				}
-				switch (*(p + tt  + z + 64)  ) {
-					
-					case 1:
-						
-							GPIO_SetBits(GPIOB,GPIO_Pin_13);
-							GPIO_ResetBits(GPIOB,GPIO_Pin_14);
-							
-							break;
-					case 2: 	GPIO_ResetBits(GPIOB,GPIO_Pin_13);
-							GPIO_SetBits(GPIOB,GPIO_Pin_14);
-							break;
-					case 3: 	GPIO_SetBits(GPIOB,GPIO_Pin_13);
-							GPIO_SetBits(GPIOB,GPIO_Pin_14);
-							break;
-
-					default: 	GPIO_ResetBits(GPIOB,GPIO_Pin_13); 
-							GPIO_ResetBits(GPIOB,GPIO_Pin_14); 
-							break;
-				}
-				GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
-				GPIO_ResetBits(GPIOB,GPIO_Pin_15); // blue
-
-				//GPIOB->BSRR = ((date_temp & 0x) << 8) | ((~date_temp & 0x0F) << 24);
-				GPIO_SetBits(GPIOC,GPIO_Pin_4);
-			}
-		}
-		
-				for(x = LineIndex +32; x < 64; x += 16)
-		//x = LineIndex + 16;
-		{
-			tt = x * 8;
-			for(z = 0; z < 8; z++) {
-				GPIO_ResetBits(GPIOC,GPIO_Pin_4);
-				//date_temp  = *(p +x);
-				//date_temp |= *(p +x + 512) << 4;
-
-				switch (*(p + tt  + z) ) {
-					//ReturnByte(*(p + x  + z));
-					case 1: 	
-
-							GPIO_ResetBits(GPIOB,GPIO_Pin_10);
-							GPIO_SetBits(GPIOB,GPIO_Pin_11);
-							
-							break;
-					case 2: 	GPIO_SetBits(GPIOB,GPIO_Pin_10);
-							GPIO_ResetBits(GPIOB,GPIO_Pin_11);
-							break;
-					case 3: 	GPIO_SetBits(GPIOB,GPIO_Pin_10);
-							GPIO_ResetBits(GPIOB,GPIO_Pin_11);
-							break;
-					default: 	GPIO_ResetBits(GPIOB,GPIO_Pin_10); 
-							GPIO_ResetBits(GPIOB,GPIO_Pin_11); 
-							break;
-				}
-				switch (*(p + tt  + z + 64)  ) {
-					
-					case 1:
-						
-							GPIO_ResetBits(GPIOB,GPIO_Pin_13);
-							GPIO_SetBits(GPIOB,GPIO_Pin_14);
-							
-							break;
-					case 2: 	GPIO_ResetBits(GPIOB,GPIO_Pin_13);
-							GPIO_SetBits(GPIOB,GPIO_Pin_14);
-							break;
-					case 3: 	GPIO_SetBits(GPIOB,GPIO_Pin_13);
-							GPIO_SetBits(GPIOB,GPIO_Pin_14);
-							break;
-
-					default: 	GPIO_ResetBits(GPIOB,GPIO_Pin_13); 
-							GPIO_ResetBits(GPIOB,GPIO_Pin_14); 
-							break;
-				}
-				GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
-				GPIO_ResetBits(GPIOB,GPIO_Pin_15); // blue
-
-				//GPIOB->BSRR = ((date_temp & 0x) << 8) | ((~date_temp & 0x0F) << 24);
-				GPIO_SetBits(GPIOC,GPIO_Pin_4);
-			}
-		}
-		#endif
-		// 
-		if (Red == diplay_data.color)
-			display_color = Red;
-		else if (Green== diplay_data.color)
-			display_color = Green;
-		else
-			display_color = Yellow;
-		i = 0;
-		if(display_color == Yellow) {
-			for(x = LineIndex; x < ScreenLength * 16; x += 16)
+			//GPIOB->BSRR = GPIO_Pin_15;
+			//GPIOB->BRR = GPIO_Pin_13;
+			GPIOB->BRR = GPIO_Pin_14;
+			GPIOB->BRR = GPIO_Pin_10;
+			GPIOB->BRR = GPIO_Pin_11;
+		#if 1
+			for(x = LineIndex; x < 192; x += 32)
 			{
-				//if(++i >= diplay_data.display_time)
-				//	OffDisplay();
-				tt = x * 8;
+				m1 = x * 8 + 32;
+				m2 = m1 + 128;
+        n1 = m1 + 64;
+				n2 = n1 + 128;
 				for(z = 0; z < 8; z++) {
 					GPIOC->BRR = GPIO_Pin_4;//GPIO_ResetBits(GPIOC,GPIO_Pin_4);
-
-					if(*(p + tt  + z) ) {
-						GPIOB->BSRR = GPIO_Pin_10;//GPIO_SetBits(GPIOB,GPIO_Pin_10);
-						GPIOB->BSRR = GPIO_Pin_11;//GPIO_SetBits(GPIOB,GPIO_Pin_11);
+					if(*(p + m1  + z) ) {
+						GPIOB->BSRR = GPIO_Pin_12;//GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
 					}
 					else {
-						GPIOB->BRR = GPIO_Pin_10;//GPIO_ResetBits(GPIOB,GPIO_Pin_10); 
-						GPIOB->BRR = GPIO_Pin_11;//GPIO_ResetBits(GPIOB,GPIO_Pin_11); 
+						GPIOB->BRR = GPIO_Pin_12;//GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
 					}
-					if(*(p + tt  + z + 64)  ) {
-						GPIOB->BSRR = GPIO_Pin_13;//GPIO_SetBits(GPIOB,GPIO_Pin_13);
-						GPIOB->BSRR = GPIO_Pin_14;//GPIO_SetBits(GPIOB,GPIO_Pin_14);
-					}			
+					if(*(p + n1  + z) ) {
+						GPIOB->BSRR = GPIO_Pin_13;//GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
+					}
 					else {
-						GPIOB->BRR = GPIO_Pin_13;//GPIO_ResetBits(GPIOB,GPIO_Pin_13); 
-						GPIOB->BRR = GPIO_Pin_14;//GPIO_ResetBits(GPIOB,GPIO_Pin_14); 
+						GPIOB->BRR = GPIO_Pin_13;//GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
 					}
-					GPIOB->BRR = GPIO_Pin_12;//GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
-					GPIOB->BRR = GPIO_Pin_15;//GPIO_ResetBits(GPIOB,GPIO_Pin_15); // blue
-
 					//GPIOB->BSRR = ((date_temp & 0x) << 8) | ((~date_temp & 0x0F) << 24);
-					GPIOC->BSRR = GPIO_Pin_4;//GPIO_SetBits(GPIOC,GPIO_Pin_4);
+					GPIOC->BSRR = GPIO_Pin_4;
+				}
+				for(z = 0; z < 8; z++) {
+					GPIOC->BRR = GPIO_Pin_4;//GPIO_ResetBits(GPIOC,GPIO_Pin_4);
+					if(*(p + m2  + z) ) {
+						GPIOB->BSRR = GPIO_Pin_12;//GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
+					}
+					else {
+						GPIOB->BRR = GPIO_Pin_12;//GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
+					}
+					if(*(p + n2  + z) ) {
+						GPIOB->BSRR = GPIO_Pin_13;//GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
+					}
+					else {
+						GPIOB->BRR = GPIO_Pin_13;//GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
+					}
+					//GPIOB->BSRR = ((date_temp & 0x) << 8) | ((~date_temp & 0x0F) << 24);
+					GPIOC->BSRR = GPIO_Pin_4;
+				}
+				//m1+=32;
+				//n1+=32;
+				//m2+=32;
+				//n2+=32;
+				m1-=32;
+				n1-=32;
+				m2-=32;
+				n2-=32;
+				for(z = 0; z < 8; z++) {
+					GPIOC->BRR = GPIO_Pin_4;//GPIO_ResetBits(GPIOC,GPIO_Pin_4);
+					if(*(p + m1  + z) ) {
+						GPIOB->BSRR = GPIO_Pin_12;//GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
+					}
+					else {
+						GPIOB->BRR = GPIO_Pin_12;//GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
+					}
+					if(*(p + n1  + z) ) {
+						GPIOB->BSRR = GPIO_Pin_13;//GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
+					}
+					else {
+						GPIOB->BRR = GPIO_Pin_13;//GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
+					}
+					//GPIOB->BSRR = ((date_temp & 0x) << 8) | ((~date_temp & 0x0F) << 24);
+					GPIOC->BSRR = GPIO_Pin_4;
+				}
+				for(z = 0; z < 8; z++) {
+					GPIOC->BRR = GPIO_Pin_4;//GPIO_ResetBits(GPIOC,GPIO_Pin_4);
+					if(*(p + m2  + z) ) {
+						GPIOB->BSRR = GPIO_Pin_12;//GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
+					}
+					else {
+						GPIOB->BRR = GPIO_Pin_12;//GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
+					}
+					if(*(p + n2  + z) ) {
+						GPIOB->BSRR = GPIO_Pin_13;//GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
+					}
+					else {
+						GPIOB->BRR = GPIO_Pin_13;//GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
+					}
+					//GPIOB->BSRR = ((date_temp & 0x) << 8) | ((~date_temp & 0x0F) << 24);
+					GPIOC->BSRR = GPIO_Pin_4;
 				}
 				
+				
 			}
-		}
-		//
-		else if(display_color == Red) {
-			for(x = LineIndex; x < ScreenLength * 16; x += 16)
-			{
-				//if(++i >= diplay_data.display_time)
-				//	OffDisplay();
-				tt = x * 8;
-				for(z = 0; z < 8; z++) {
-					GPIOC->BRR = GPIO_Pin_4;//GPIO_ResetBits(GPIOC,GPIO_Pin_4);
-
-					if(*(p + tt  + z) ) {
-						GPIOB->BSRR = GPIO_Pin_10;//GPIO_SetBits(GPIOB,GPIO_Pin_10);
-					}
-					else {
-						GPIOB->BRR = GPIO_Pin_10;//GPIO_ResetBits(GPIOB,GPIO_Pin_10); 
-					}
-					if(*(p + tt  + z + 64)  ) {
-						GPIOB->BSRR = GPIO_Pin_13;//GPIO_SetBits(GPIOB,GPIO_Pin_13);
-					}			
-					else {
-						GPIOB->BRR = GPIO_Pin_13;//GPIO_ResetBits(GPIOB,GPIO_Pin_13); 
-					}
-					GPIOB->BRR = GPIO_Pin_11;//GPIO_ResetBits(GPIOB,GPIO_Pin_11); 
-					GPIOB->BRR = GPIO_Pin_12;//GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
-					GPIOB->BRR = GPIO_Pin_14;//GPIO_ResetBits(GPIOB,GPIO_Pin_14); 
-					GPIOB->BRR = GPIO_Pin_15;//GPIO_ResetBits(GPIOB,GPIO_Pin_15); // blue
-
-					//GPIOB->BSRR = ((date_temp & 0x) << 8) | ((~date_temp & 0x0F) << 24);
-					GPIOC->BSRR = GPIO_Pin_4;//GPIO_SetBits(GPIOC,GPIO_Pin_4);
-				}
-			}
-		}
-		//
-		else{
-			for(x = LineIndex; x < ScreenLength * 16; x += 16)
-			{
-				//if(++i >= diplay_data.display_time)
-				//	OffDisplay();
-				tt = x * 8;
-				for(z = 0; z < 8; z++) {
-					GPIOC->BRR = GPIO_Pin_4;//GPIO_ResetBits(GPIOC,GPIO_Pin_4);
-
-					if(*(p + tt  + z) ) {
-						GPIOB->BSRR = GPIO_Pin_11;//GPIO_SetBits(GPIOB,GPIO_Pin_11);
-					}
-					else {
-						GPIOB->BRR = GPIO_Pin_11;//GPIO_ResetBits(GPIOB,GPIO_Pin_11); 
-					}
-					if(*(p + tt  + z + 64)  ) {
-						GPIOB->BSRR = GPIO_Pin_14;//GPIO_SetBits(GPIOB,GPIO_Pin_14);
-					}			
-					else {
-						GPIOB->BRR = GPIO_Pin_14;//GPIO_ResetBits(GPIOB,GPIO_Pin_14); 
-					}
-					GPIOB->BRR = GPIO_Pin_10;//GPIO_ResetBits(GPIOB,GPIO_Pin_10); 
-					GPIOB->BRR = GPIO_Pin_12;//GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
-					GPIOB->BRR = GPIO_Pin_13;//GPIO_ResetBits(GPIOB,GPIO_Pin_13); 
-					GPIOB->BRR = GPIO_Pin_15;//GPIO_ResetBits(GPIOB,GPIO_Pin_15); // blue
-
-					//GPIOB->BSRR = ((date_temp & 0x) << 8) | ((~date_temp & 0x0F) << 24);
-					GPIOC->BSRR = GPIO_Pin_4;//GPIO_SetBits(GPIOC,GPIO_Pin_4);
-				}
-			}
-		}
-		//
+			#endif
 		
-		//
-
-		#if 0
-		for(j = 0; j < 3; j++)
-		{
-			x = (uint16_t)(LineIndex + j * 32) * MaxLine;
-			for(y = 0; y < MaxLine; y += 8)
-			{
-				for(z = 0; z < 8; z++)
-				{
-					GPIO_ResetBits(GPIOC,GPIO_Pin_4);
-
-					GPIO_ResetBits(GPIOB,GPIO_Pin_10); // red
-					GPIO_SetBits(GPIOB,GPIO_Pin_11); // greed
-					GPIO_ResetBits(GPIOB,GPIO_Pin_12); // blue
-					
-					GPIO_SetBits(GPIOB,GPIO_Pin_13);
-					GPIO_ResetBits(GPIOB,GPIO_Pin_14);
-					GPIO_SetBits(GPIOB,GPIO_Pin_15);
-					
-					GPIO_SetBits(GPIOC,GPIO_Pin_4);
-				}
-			}
-		}
-		//
+		nop();nop();nop();nop();nop();nop();nop();
+		nop();nop();nop();nop();nop();nop();nop();
+		
+		#if 1
+		OffDisplay;
 		#endif
-
 		
-		TIM3->CR1 &= (uint16_t)(~((uint16_t)TIM_CR1_CEN));	// 1
-		OffDisplay();													// 关显示	 低电平
 		
 		nop();nop();nop();nop();nop();nop();nop();
-		nop();nop();nop();nop();nop();nop();nop();
-		
-		
-		if(LineIndex & 0x01) GPIOC->BSRR = GPIO_Pin_6;//GPIO_SetBits(GPIOC,GPIO_Pin_6);			//行选择
-		else                 GPIOC->BRR = GPIO_Pin_6;//GPIO_ResetBits(GPIOC,GPIO_Pin_6);
-		
-		if(LineIndex & 0x02) GPIOC->BSRR = GPIO_Pin_7; // GPIO_SetBits(GPIOC,GPIO_Pin_7);
-		else                 GPIOC->BRR = GPIO_Pin_7; // GPIO_ResetBits(GPIOC,GPIO_Pin_7);
-		
-		if(LineIndex & 0x04) GPIOC->BSRR = GPIO_Pin_9;// GPIO_SetBits(GPIOC,GPIO_Pin_9);
-		else                 GPIOC->BRR = GPIO_Pin_9;// GPIO_ResetBits(GPIOC,GPIO_Pin_9);
-		
-		
-		
-		
 		GPIOC->BSRR = GPIO_Pin_5; //GPIO_SetBits(GPIOC,GPIO_Pin_5);//	//595锁存	
-		
 		
 		nop();nop();nop();nop();nop();nop();nop();
 		#if 1
-		if(diplay_data.display_time > 0)
-		{
-			//TIM3->ARR  = SysDisplaySpeed * 10 * diplay_data.display_time / 15;
-			TIM3->ARR  = diplay_data.display_time;//(10 * diplay_data.display_time) / 15;
- 			TIM3->EGR |= TIM_EGR_UG;		// 1
- 			TIM3->CR1 |= TIM_CR1_CEN;		// 1
-		}
+		if(LineIndex == 0x00) GPIOC->BRR = GPIO_Pin_6;//GPIO_SetBits(GPIOC,GPIO_Pin_6);			//行选择
+		else                 GPIOC->BSRR = GPIO_Pin_6;//GPIO_ResetBits(GPIOC,GPIO_Pin_6);
+		
+		if(LineIndex == 0x01) GPIOC->BRR = GPIO_Pin_7; // GPIO_SetBits(GPIOC,GPIO_Pin_7);
+		else                 GPIOC->BSRR = GPIO_Pin_7; // GPIO_ResetBits(GPIOC,GPIO_Pin_7);
+		
+		if(LineIndex == 0x02) GPIOC->BRR = GPIO_Pin_9;// GPIO_SetBits(GPIOC,GPIO_Pin_9);
+		else                 GPIOC->BSRR = GPIO_Pin_9;// GPIO_ResetBits(GPIOC,GPIO_Pin_9);
+		
+		if(LineIndex == 0x03) GPIOC->BRR = GPIO_Pin_8;
+		else                 GPIOC->BSRR = GPIO_Pin_8;
 		#endif
-		OnDisplay();													//开显示
+		
 
 		//
 		if(++LineIndex >= SaoMiao)
 		{
+			
+			
 			LineIndex = 0;
 			
-			if(++LED_Index >= 30) LED_Index = 0;
-			
-			switch(LED_Index)
-			{
-				case  0: LEDON();break;
-				case 15: LEDOFF();break;
-				default: break;
-			}
-			
-			HaveDisplayNum++;
-			if ((diplay_data.style) && (HaveDisplayNum >= diplay_data.style)) {
-			//if ((++HaveDisplayNum >= diplay_data.style) &&  (DISPLAY_STATIC != diplay_data.style)) {
+			//if(++LED_Index >= 30){Bemove = 1; LED_Index = 0;}
+			LED_Index++;
+			if(LED_Index > speed_num){
+				LED_Index = 0;
 				Bemove = 1;
-				HaveDisplayNum = 0;
 			}
-			//else if(diplay_data.length > ScreenLength)
-			else
-			{
-				if((upturn_index < 16) && (HaveDisplayNum >= diplay_data.upstyle)) {
-						Bemove = 1;
-						HaveDisplayNum = 0;upturn_index++;
-				}
-				//else if(HaveDisplayNum > 90) {
-				//	Bemove = 1;
-				//	HaveDisplayNum = 0;
-				//	upturn_index = 0;
-				//}
-				
-			}
-			//if(!diplay_data.if_screen_off && !display_done_p) {
-				//time_index++;
-				time_upindex++;
-				//time_sec = time_index / 250;
-				time_upsec = time_upindex / 1000;
-			//}
-			//if(time_upsec > 0){
-			//	temp[0] = 0x99;
-			//	temp[1] = time_upsec;
-			//	temp[2] = time_sec;
-				
-				//Can_Send_Msg(temp, 8);
-			//}
+			
+			if(!LED_Index)
+				LEDON();
+			else if(8 == LED_Index)
+				LEDOFF();
+
+		}
+		if(++time_upindex > 1999){
+			time_upindex = 0;
+			time_upsec++;
 		}
 		#if 1
-		//if(!diplay_data.display_time)
-		//{
-		//	OffDisplay();
-		//}
 		#endif
 		
 		
