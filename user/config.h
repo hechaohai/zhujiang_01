@@ -219,6 +219,7 @@ __CONFIG_H_EXT__ u8 update_agreement;
 
 __CONFIG_H_EXT__ u8 display_done; // 0 显示中不更换，1 显示完一条信息
 __CONFIG_H_EXT__ u8 display_done_p; // 已经发送显示完成
+__CONFIG_H_EXT__ u8 display_done_fankui; // 显示完反馈
 
 __CONFIG_H_EXT__ u8 display_list[4];
 __CONFIG_H_EXT__ u8 display_list_index;
@@ -230,7 +231,7 @@ typedef struct {
 	u8 color;
 	u8 style;
 	u8 upstyle;
-	u8 if_screen_off;
+	u8 follow_up_action;
 	u8 change_time;
 	u8 text[100];
 	u8 length;
@@ -259,7 +260,7 @@ typedef struct {
 	u8 color;
 	u8 style;
 	u8 upstyle;
-	u8 if_screen_off;
+	u8 follow_up_action;
 	u8 change_time;
 	u8 text[100];
 	u8 length;

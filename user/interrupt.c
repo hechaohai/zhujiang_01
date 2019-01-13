@@ -408,6 +408,11 @@ void TIM2_IRQHandler(void)
 						Bemove = 1;
 						HaveDisplayNum = 0;upturn_index++;
 				}
+				if(upturn_index == 16){
+					time_upsec = 0;
+					time_upindex = 0;
+					upturn_index = 17;
+				}
 				//else if(HaveDisplayNum > 90) {
 				//	Bemove = 1;
 				//	HaveDisplayNum = 0;
@@ -415,7 +420,7 @@ void TIM2_IRQHandler(void)
 				//}
 				
 			}
-			//if(!diplay_data.if_screen_off && !display_done_p) {
+			//if(!diplay_data.follow_up_action && !display_done_p) {
 				//time_index++;
 				time_upindex++;
 				//time_sec = time_index / 250;

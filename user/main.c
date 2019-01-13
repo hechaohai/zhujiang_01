@@ -129,11 +129,11 @@ Data_Init();
 	//
 	//LEDOFF();
 	LEDON();
-
+	check_timeout();
 	while(1)
 	{
 		//IWDG_ReloadCounter();
-		check_timeout();
+		
 		Communication();
 		do_update_text();
 		
@@ -161,7 +161,7 @@ void check_timeout(void)
 	{
 		Can_Send_Msg(temp, 8);
 		timeout_flag = 0;
-		//if(diplay_data.if_screen_off)
+		//if(diplay_data.follow_up_action)
 		
 		diplay_data.style = 0;//静止显示
 		if (!diplay_data.upstyle)
@@ -229,7 +229,7 @@ void do_update_text(void)
 			diplay_data.color = currnet_data[0].color;
 			diplay_data.style = currnet_data[0].style;
 			diplay_data.upstyle = currnet_data[0].upstyle;
-			diplay_data.if_screen_off = currnet_data[0].if_screen_off;
+			diplay_data.follow_up_action = currnet_data[0].follow_up_action;
 		}
 
 		updata_flag = 0;
@@ -340,7 +340,7 @@ u8 temp[8] = {0,0,0,0,0,0,0,0};
 
 	u8 temp8, ret;
 
-	if(diplay_data.if_screen_off && display_done_p)
+	if(diplay_data.follow_up_action != 2 && display_done_p)
 		return;
 	// 上翻一行
 	if (Bemove && diplay_data.upstyle) {
@@ -388,7 +388,7 @@ u8 temp[8] = {0,0,0,0,0,0,0,0};
 	//
 	
 	// 换一屏时间到
-	if (time_upsec >= diplay_data.change_time) {
+	if ((time_upsec >= diplay_data.change_time) && (upturn_index >= 16)) {
 
 		if(!diplay_data.change_time)
 			return;
@@ -401,10 +401,13 @@ u8 temp[8] = {0,0,0,0,0,0,0,0};
 				temp[0] = NOTIFY;
 				//if(display_done_p)
 					temp[2] = 0xAA;
-				Can_Send_Msg(temp, 8);
+				if(display_done_fankui){
+					display_done_fankui = 0;
+					Can_Send_Msg(temp, 8);
+				}
 				display_done_p = 1;
 			//}
-			if(diplay_data.if_screen_off) {
+			if(diplay_data.follow_up_action == 0) {
 				for (x = 0; x < DisplayBufMaxLength; x++){
 					DisplayBuf0[x] = 0;
 					DisplayBuf1[x] = 0;
@@ -494,7 +497,7 @@ void MoveWordLine(void)
 	
 	Bemove = 0;
 	
-	if(diplay_data.if_screen_off && display_done_p)
+	if(diplay_data.follow_up_action != 2 && display_done_p)
 		return;
 	if(DisplayIndex) {p = &DisplayBuf0[0]; pp = &DisplayBuf1[0];}// 	if(DisplayIndex)  p = DisplayBuf0, pp = DisplayBuf1;
 	else             {p = &DisplayBuf1[0]; pp = &DisplayBuf0[0];}// 	else              p = DisplayBuf1, pp = DisplayBuf0;
@@ -582,7 +585,8 @@ void MoveWordLine(void)
 	if(++MoveIndex >= 8)
 	{
 		MoveIndex = 0;
-		if(++MovetextNum >= (diplay_data.length + ScreenLength))
+		//if(++MovetextNum >= (diplay_data.length + ScreenLength))
+		if(++MovetextNum >= (diplay_data.length))
 		{
 			MovetextNum = 0;
 			diplay_data.display_count++;
@@ -592,9 +596,12 @@ void MoveWordLine(void)
 				temp[0] = NOTIFY;
 				//if(display_done_p)
 					temp[2] = 0xAA;
-				Can_Send_Msg(temp, 8);
+				if(display_done_fankui){
+					display_done_fankui = 0;
+					Can_Send_Msg(temp, 8);
+				}
 			//}
-			if(diplay_data.if_screen_off) {
+			if(diplay_data.follow_up_action == 0) {
 				for (x = 0; x < DisplayBufMaxLength; x++){
 					DisplayBuf0[x] = 0;
 					DisplayBuf1[x] = 0;
@@ -615,10 +622,10 @@ void Communication(void)
 	u32 addr, ui32;
 	u16 x, y,length;
 	u8 id,index,i,j,z,ret,count,count_m,data_temp,col;
+	u8 a,b,c;
 	u8 temp[8] = {0,0,0,0,0,0,0,0};
 	u8 canbuf[8]={1,2,3,4,5,6,7,8};
 	USART_InitTypeDef	USART_InitStructure;
-	u8 data;
 
 	u8 buf_recved[8]  = {RECVED,0,0,0,0,0,0,0};
 	u8 buf_require[8] = {REQUIRE,0,0,0,0,0,0,0};
@@ -822,66 +829,61 @@ void Communication(void)
 					currnet_data[0].upstyle = 0;
 					//diplay_data.upstyle = 0;
 			
+					ret = agreement_data.control.data[4];
+			
+			//switch(agreement_data.control.data[4]){
+			if((ret < 20) && (ret > 10)){
+				a = 20 - ret;
+				b = 26 - ret;
+				c = a * b;
+				currnet_data[0].upstyle = c;
+			}
+			else if((ret > 0) && (ret < 10)){
+				currnet_data[0].style = 5 + (10 - ret) * (10 - ret);
+			}
+
+
+#if 0
+					if (ret == 19)    {currnet_data[0].upstyle = 12;}
+					else if(18 == ret){currnet_data[0].upstyle = 18;}
+					else if(17 == ret){currnet_data[0].upstyle = 24;}
+					else if(16 == ret){currnet_data[0].upstyle = 30;}
+					else if(15 == ret){currnet_data[0].upstyle = 42;}
+					else if(14 == ret){currnet_data[0].upstyle = 60;}
+					else if(13 == ret){currnet_data[0].upstyle = 90;}
+					else if(12 == ret){currnet_data[0].upstyle = 132;}
+					else if(11 == ret){currnet_data[0].upstyle = 216;}
 					
-					if (agreement_data.control.data[4] > 19){
-					}
-					else if (agreement_data.control.data[4] > 10){
-						currnet_data[0].upstyle = 20 - agreement_data.control.data[4];
-					}
-					else if (agreement_data.control.data[4] > 9){
-					}
-					else if (agreement_data.control.data[4] > 0) {
-						switch(agreement_data.control.data[4]) {
-							case 9:
-								currnet_data[0].style = 6;//3;
-								break;
-							case 8:
-								currnet_data[0].style = 9;//3;
-								break;
-							case 7:
-								currnet_data[0].style = 12;//4;
-								break;
-							case 6:
-								currnet_data[0].style = 15;//5;
-								break;
-							case 5:
-								currnet_data[0].style = 21;//7;
-								break;
-							case 4:
-								currnet_data[0].style = 30;//10;
-								break;
-							case 3:
-								currnet_data[0].style = 45;//15;
-								break;
-							case 2:
-								currnet_data[0].style = 66;//;
-								break;
-							case 1:
-								currnet_data[0].style = 108;//36;
-								break;
-							//case 0:
-							//	currnet_data[0].style = 0;
-							//	break;
-							default:
-								currnet_data[0].style = 200;//2
-								break;
-						}
-					}
+					else if(ret == 9){currnet_data[0].style = 6;}
+					else if(ret == 8){currnet_data[0].style = 9;}
+					else if(ret == 7){currnet_data[0].style = 12;}
+					else if(ret == 6){currnet_data[0].style = 15;}
+					else if(ret == 5){currnet_data[0].style = 21;}
+					else if(ret == 4){currnet_data[0].style = 30;}
+					else if(ret == 3){currnet_data[0].style = 45;}
+					else if(ret == 2){currnet_data[0].style = 66;}
+					else if(ret == 1){currnet_data[0].style = 108;}
 					
+#endif					
 					currnet_data[0].change_time = agreement_data.control.data[5];
 					if(!currnet_data[0].change_time)
 						currnet_data[0].change_time = 3;
 					
 					if(agreement_data.control.data[6] & 0x80) {
-						temp[0] = NOTIFY;
-						if(display_done_p)
-							temp[2] = 0xAA;
-						Can_Send_Msg(temp, 8);
+						display_done_fankui = 1;
+						//temp[0] = NOTIFY;
+						//if(display_done_p)
+						//	temp[2] = 0xAA;
+						//Can_Send_Msg(temp, 8);
 					}
-					if (agreement_data.control.data[6] & 0x3)
-						currnet_data[0].if_screen_off = 0;
 					else
-						currnet_data[0].if_screen_off = 1;
+						display_done_fankui = 0;
+					
+					//if (agreement_data.control.data[6] & 0x3)
+					//	currnet_data[0].follow_up_action = 0;
+					//else
+					//	currnet_data[0].follow_up_action = 1;
+					currnet_data[0].follow_up_action = agreement_data.control.data[6] & 0x3;
 					
 					
 					//亮度

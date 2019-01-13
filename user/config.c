@@ -103,6 +103,7 @@ void load_diplay(void)
 	
 display_done = 0;
 display_done_p = 0;
+display_done_fankui = 0;
 	
 	if(DisplayIndex) {p = &DisplayBuf0[0]; pp = &DisplayBuf1[0];}// 	if(DisplayIndex)  p = DisplayBuf0, pp = DisplayBuf1;
 	else             {p = &DisplayBuf1[0]; pp = &DisplayBuf0[0];}// 	else              p = DisplayBuf1, pp = DisplayBuf0;
@@ -126,7 +127,7 @@ display_done_p = 0;
 		currnet_data[i].color = Yellow;
 		currnet_data[i].style = 9;//DISPLAY_MOVE;//
 		currnet_data[i].upstyle = 1;
-		currnet_data[i].if_screen_off = 0;
+		currnet_data[i].follow_up_action = 2;
 		currnet_data[i].display_count = 0;
 		currnet_data[i].length = 0;//sizeof(const_word);
 	}
@@ -137,7 +138,7 @@ display_done_p = 0;
 	diplay_data.color = currnet_data[0].color;
 	diplay_data.style = currnet_data[0].style;//DISPLAY_MOVE;//
 	diplay_data.upstyle = 3;
-	diplay_data.if_screen_off = 0;
+	diplay_data.follow_up_action = 2;
 	diplay_data.display_count = currnet_data[0].display_count;
 	diplay_data.length = 0;//sizeof(const_word);
 	for (i = 0; i < sizeof(const_word); i++) {
